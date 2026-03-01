@@ -1,0 +1,250 @@
+---
+title: Modrinth Modpacks
+description: Automatically install Modrinth modpacks with required mod loaders
+---
+
+[Modrinth Modpacks](https://modrinth.com/modpacks) can automatically be installed along with the required mod loader (Forge, Fabric, or Quilt) by setting `MODPACK_PLATFORM`, `MOD_PLATFORM` or `TYPE` to `MODRINTH`.
+
+Upgrading and downgrading automatically cleans up old files and manages the mod loader version.
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TYPE` | Yes | Set to `MODRINTH` |
+| `MODRINTH_MODPACK` | Yes | Project slug, ID, URL, or path to mrpack file |
+| `MODRINTH_VERSION` | No | Specific version ID or number |
+| `MODRINTH_MODPACK_VERSION_TYPE` | No | Filter by `release`, `beta`, or `alpha` |
+| `MODRINTH_LOADER` | No | Filter by `forge`, `fabric`, or `quilt` |
+| `MODRINTH_EXCLUDE_FILES` | No | Comma/newline list of files to exclude |
+| `MODRINTH_FORCE_INCLUDE_FILES` | No | Comma/newline list of files to force include |
+| `MODRINTH_IGNORE_MISSING_FILES` | No | Glob pattern of files to ignore if missing |
+| `MODRINTH_OVERRIDES_EXCLUSIONS` | No | Ant-style paths to exclude from overrides |
+| `MODRINTH_FORCE_SYNCHRONIZE` | No | Force re-evaluation of excludes/includes |
+| `MODRINTH_DEFAULT_EXCLUDE_INCLUDES` | No | Set to empty to disable default excludes |
+
+## Specifying the Modpack
+
+The `MODRINTH_MODPACK` variable accepts multiple formats:
+
+### Project Slug
+
+The slug is located in the URL:
+
+```yaml
+MODRINTH_MODPACK: cobblemon-fabric
+```
+
+### Project ID
+
+Found in the bottom of the left panel on the project page:
+
+```yaml
+MODRINTH_MODPACK: 5FFgwNNP
+```
+
+### Project Page URL
+
+```yaml
+MODRINTH_MODPACK: https://modrinth.com/modpack/cobblemon-fabric
+```
+
+### Version Page URL
+
+For a specific version:
+
+```yaml
+MODRINTH_MODPACK: https://modrinth.com/modpack/cobblemon-fabric/version/1.3.2
+```
+
+### Custom mrpack URL
+
+```yaml
+MODRINTH_MODPACK: https://example.com/my-modpack.mrpack
+```
+
+### Local mrpack File
+
+```yaml
+MODRINTH_MODPACK: /modpacks/my-pack.mrpack
+```
+
+## Version Selection
+
+<Steps>
+  <Step title="Default behavior">
+    Latest release version is selected when `VERSION` is `LATEST`
+    
+    Latest beta version is selected when `VERSION` is `SNAPSHOT`
+  </Step>
+  
+  <Step title="Override version type">
+    Set `MODRINTH_MODPACK_VERSION_TYPE` to filter versions:
+    
+    ```yaml
+    MODRINTH_MODPACK_VERSION_TYPE: beta
+    ```
+  </Step>
+  
+  <Step title="Narrow by Minecraft version">
+    Set `VERSION` to a specific Minecraft version:
+    
+    ```yaml
+    VERSION: "1.19.2"
+    ```
+  </Step>
+  
+  <Step title="Filter by mod loader">
+    Set `MODRINTH_LOADER` to specify the loader:
+    
+    ```yaml
+    MODRINTH_LOADER: fabric
+    ```
+  </Step>
+</Steps>
+
+## Examples
+
+<CodeGroup>
+```yaml Auto-updating Modpack
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      MODPACK_PLATFORM: MODRINTH
+      MODRINTH_MODPACK: cobblemon-fabric
+    volumes:
+      - ./data:/data
+    ports:
+      - "25565:25565"
+```
+
+```yaml Specific Version
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      MODPACK_PLATFORM: MODRINTH
+      MODRINTH_MODPACK: https://modrinth.com/modpack/cobblemon-fabric/version/1.6.1.4
+    volumes:
+      - ./data:/data
+    ports:
+      - "25565:25565"
+```
+
+```yaml With Version ID
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      MODPACK_PLATFORM: MODRINTH
+      MODRINTH_MODPACK: cobblemon-fabric
+      MODRINTH_VERSION: 98odLiu9
+    volumes:
+      - ./data:/data
+    ports:
+      - "25565:25565"
+```
+
+```yaml Better MC Example
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: true
+      MODPACK_PLATFORM: MODRINTH
+      MODRINTH_MODPACK: https://modrinth.com/modpack/better-mc-forge-bmc4/version/v34.5
+      MODRINTH_OVERRIDES_EXCLUSIONS: |
+        config/paxi/datapacks/BE_default_endgen_fix*
+      MODRINTH_FORCE_SYNCHRONIZE: true
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+</CodeGroup>
+
+## Excluding Files
+
+To exclude client mods incorrectly declared as server-compatible:
+
+```yaml
+environment:
+  MODRINTH_EXCLUDE_FILES: |
+    notenoughanimations
+    lambdynamiclights
+    euphoriapatcher
+  MODRINTH_FORCE_SYNCHRONIZE: "true"
+```
+
+<Note>
+You may need to set `MODRINTH_FORCE_SYNCHRONIZE` to `true` while iterating on a compatible set of mods.
+</Note>
+
+## Force-Including Files
+
+To force include specific mods:
+
+```yaml
+environment:
+  MODRINTH_FORCE_INCLUDE_FILES: |
+    yet-another-config-lib
+```
+
+## Ignoring Missing Files
+
+Some mods like [MCInstance Loader](https://modrinth.com/mod/mcinstance-loader) use temporary files that get deleted. Prevent re-installation by ignoring them:
+
+```yaml
+environment:
+  MODRINTH_IGNORE_MISSING_FILES: |
+    config/mcinstanceloader/pack.mcinstance
+    mods/*.jar
+```
+
+## Excluding Overrides Files
+
+Modrinth mrpack files may include an `overrides` subdirectory with config files, world data, and extra mods. Exclude specific files using ant-style paths:
+
+```yaml
+environment:
+  MODRINTH_OVERRIDES_EXCLUSIONS: |
+    mods/NekosEnchantedBooks-*.jar
+    mods/citresewn-*.jar
+```
+
+### Ant-style Path Patterns
+
+| Symbol | Behavior |
+|--------|----------|
+| `*` | Matches zero, one, or many characters except a slash |
+| `**` | Matches zero, one, or many characters including slashes |
+| `?` | Matches one character |
+
+## Default Exclude/Includes
+
+The image includes default exclude/include rules maintained in the [repository](https://github.com/itzg/docker-minecraft-server/blob/master/files/modrinth-exclude-include.json).
+
+Disable defaults by setting:
+
+```yaml
+environment:
+  MODRINTH_DEFAULT_EXCLUDE_INCLUDES: ""
+```
+
+## Troubleshooting
+
+<Warning>
+If files become inconsistent, set `MODRINTH_FORCE_SYNCHRONIZE` to `true` to force re-evaluation of all mod files.
+</Warning>
+
+<Note>
+Modrinth modpacks often require significant memory. Set `MEMORY` to at least `4G` for most modpacks.
+</Note>

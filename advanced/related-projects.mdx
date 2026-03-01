@@ -1,0 +1,286 @@
+---
+title: Related Projects
+description: Complementary tools and projects in the Docker Minecraft ecosystem
+---
+
+A collection of related projects and tools that complement the Docker Minecraft Server image, all maintained by the same ecosystem.
+
+## Server Images
+
+### [itzg/minecraft-bedrock-server](https://github.com/itzg/docker-minecraft-bedrock-server)
+
+Docker image that runs a Minecraft Bedrock Edition server, enabling cross-platform play with mobile and console devices.
+
+**Key Features:**
+- Bedrock Edition support
+- Cross-platform compatibility
+- Similar configuration patterns to the Java edition image
+- Automatic updates
+
+```yaml
+services:
+  bedrock:
+    image: itzg/minecraft-bedrock-server
+    environment:
+      EULA: "true"
+    ports:
+      - "19132:19132/udp"
+    volumes:
+      - ./bedrock-data:/data
+```
+
+## Network and Proxy Tools
+
+### [mc-router](https://github.com/itzg/mc-router)
+
+Lightweight multiplexer/proxy for Minecraft Java servers. Routes players to different servers based on the hostname they use to connect.
+
+**Available as:**
+- Stand-alone application
+- Docker image
+
+**Use Cases:**
+- Host multiple Minecraft servers on a single port
+- Route players based on subdomain (e.g., `survival.example.com` vs `creative.example.com`)
+- Auto-scale servers up and down based on player activity
+
+```yaml
+services:
+  router:
+    image: itzg/mc-router
+    environment:
+      IN_DOCKER: true
+    ports:
+      - "25565:25565"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+### [itzg/mc-proxy](https://github.com/itzg/docker-bungeecord/)
+
+Docker image that runs a proxy server powered by your choice of:
+- **BungeeCord**: Classic proxy solution
+- **Velocity**: Modern, high-performance proxy
+- **Waterfall**: Optimized BungeeCord fork
+
+**Features:**
+- Connect multiple Minecraft servers into a network
+- Enable player transfer between servers
+- Central authentication and permissions
+- Load balancing capabilities
+
+```yaml
+services:
+  proxy:
+    image: itzg/mc-proxy
+    environment:
+      TYPE: VELOCITY
+    ports:
+      - "25565:25577"
+```
+
+## Management and Operations
+
+### [itzg/mc-backup](https://github.com/itzg/docker-mc-backup)
+
+Docker image that runs as a side-car container to automatically backup your Minecraft world data.
+
+**Features:**
+- Scheduled automatic backups
+- Compression and retention policies
+- Pause-backup-resume workflow (using RCON)
+- Support for various backup destinations
+- Restore capabilities
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    # ... server configuration
+  
+  backup:
+    image: itzg/mc-backup
+    environment:
+      BACKUP_INTERVAL: "2h"
+      RCON_HOST: mc
+      RCON_PASSWORD: "minecraft"
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+```
+
+### [itzg/rcon](https://github.com/itzg/docker-rcon-web-admin)
+
+Dockerized version of [rcon-web-admin](https://github.com/rcon-web-admin/rcon-web-admin), providing a web-based interface for managing your server via RCON.
+
+**Features:**
+- Web UI for server commands
+- Multi-server management
+- Command history
+- Real-time console output
+
+```yaml
+services:
+  rcon-web:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+      - "4327:4327"
+```
+
+## Command-Line Tools
+
+### [rcon-cli](https://github.com/itzg/rcon-cli)
+
+A lightweight command-line tool for sending RCON commands to Minecraft servers.
+
+**Features:**
+- Simple CLI interface
+- Pre-bundled with the minecraft-server image
+- Interactive and single-command modes
+- Useful for scripts and automation
+
+**Usage (from within container):**
+```bash
+rcon-cli /say Hello from RCON!
+rcon-cli /list
+```
+
+**Usage (external):**
+```bash
+docker exec mc rcon-cli /say Server restarting in 5 minutes
+```
+
+### [mc-monitor](https://github.com/itzg/mc-monitor)
+
+A versatile monitoring and health check tool for Minecraft servers.
+
+**Features:**
+- Health checks for Docker and Kubernetes
+- Prometheus metrics exporter
+- Telegraf data source
+- Query server status
+- Monitor player count
+
+**Pre-bundled** with the minecraft-server image.
+
+**Usage:**
+```bash
+# Status check
+mc-monitor status --host localhost
+
+# Prometheus metrics
+mc-monitor export-for-prometheus
+```
+
+**Docker health check:**
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    healthcheck:
+      test: mc-monitor status --host localhost
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+### [mc-image-helper](https://github.com/itzg/mc-image-helper)
+
+The Swiss Army knife for Minecraft server container operations. This tool provides complex, reusable preparation operations.
+
+**Features:**
+- Mod and plugin installation from various sources
+- Version resolution and downloads
+- File interpolation and templating
+- Log4j patching
+- Configuration file management
+
+**Pre-bundled** with the minecraft-server image and used internally for most automation.
+
+## Integration Examples
+
+### Full-Featured Setup with Backup and Monitoring
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "true"
+      TYPE: PAPER
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "secure-password"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: mc-monitor status --host localhost
+      interval: 30s
+  
+  backup:
+    image: itzg/mc-backup
+    environment:
+      BACKUP_INTERVAL: "2h"
+      RCON_HOST: mc
+      RCON_PASSWORD: "secure-password"
+      RETENTION_DAYS: 7
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+    depends_on:
+      - mc
+  
+  rcon-web:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+    depends_on:
+      - mc
+```
+
+### Multi-Server Network with Routing
+
+```yaml
+services:
+  router:
+    image: itzg/mc-router
+    environment:
+      IN_DOCKER: true
+    ports:
+      - "25565:25565"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  
+  survival:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "true"
+      TYPE: PAPER
+    labels:
+      mc-router.host: "survival.example.com"
+    volumes:
+      - ./survival:/data
+  
+  creative:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "true"
+      TYPE: PAPER
+      MODE: creative
+    labels:
+      mc-router.host: "creative.example.com"
+    volumes:
+      - ./creative:/data
+```
+
+## Community and Support
+
+All of these projects are:
+- Open source and actively maintained
+- Available on GitHub with issue tracking
+- Documented with examples
+- Community-supported through discussions
+
+For questions, feature requests, or bug reports, visit the respective GitHub repositories.

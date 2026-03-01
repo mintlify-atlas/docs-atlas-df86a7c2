@@ -1,0 +1,492 @@
+---
+title: Quilt Server
+description: Community-driven Fabric fork with enhanced features and improvements
+---
+
+Quilt is a modern, community-driven modding platform that forked from Fabric. It maintains compatibility with many Fabric mods while offering enhanced features, better tooling, and community governance.
+
+## Overview
+
+Quilt offers several advantages:
+
+- **Fabric Compatibility**: Many Fabric mods work with Quilt
+- **Enhanced Features**: Additional APIs and improvements over Fabric
+- **Community Driven**: Open governance and inclusive development
+- **Modern Toolchain**: Improved developer tools and documentation
+- **Active Development**: Regular updates and community support
+
+<Note>
+  Quilt aims to be compatible with Fabric mods, but not all Fabric mods are guaranteed to work. Check mod compatibility before deploying.
+</Note>
+
+## Configuration
+
+### Basic Setup
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: QUILT
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-quilt \
+  -e EULA=TRUE \
+  -e TYPE=QUILT \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+## Version Selection
+
+### Automatic Latest Versions
+
+By default, Quilt installs the latest launcher and loader:
+
+```yaml
+environment:
+  TYPE: QUILT
+  VERSION: "1.20.4"  # Minecraft version
+```
+
+This automatically:
+- Downloads the latest Quilt server launcher
+- Installs the latest Quilt loader via quilt-installer
+- Uses the specified Minecraft version (or latest if omitted)
+
+### Specific Loader Version
+
+Select a specific Quilt loader version:
+
+```yaml
+environment:
+  TYPE: QUILT
+  VERSION: "1.20.4"
+  QUILT_LOADER_VERSION: "0.16.0"
+```
+
+### Specific Installer Version
+
+Select a specific Quilt installer version:
+
+```yaml
+environment:
+  TYPE: QUILT
+  VERSION: "1.20.4"
+  QUILT_LOADER_VERSION: "0.16.0"
+  QUILT_INSTALLER_VERSION: "0.4.1"
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `QUILT` |
+| `VERSION` | latest | Minecraft version (e.g., `1.20.4`) |
+| `QUILT_LOADER_VERSION` | latest | Quilt loader version |
+| `QUILT_INSTALLER_VERSION` | latest | Quilt installer version |
+| `QUILT_LAUNCHER` | - | Path to custom launcher JAR (relative to `/data`) |
+| `QUILT_LAUNCHER_URL` | - | URL to download custom launcher |
+
+## Mod Management
+
+### Manual Mod Installation
+
+Place Quilt and compatible Fabric mods in the `mods` directory:
+
+<Steps>
+  <Step title="Mount mods directory">
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+    ```
+  </Step>
+  
+  <Step title="Download mods">
+    Download Quilt or Fabric-compatible mods from:
+    - [Modrinth](https://modrinth.com) (filter by Quilt)
+    - [CurseForge](https://www.curseforge.com/minecraft/mc-mods) (check compatibility)
+  </Step>
+  
+  <Step title="Add mod files">
+    Place `.jar` files in `./mods/` directory.
+  </Step>
+  
+  <Step title="Restart server">
+    ```bash
+    docker restart minecraft-quilt
+    ```
+  </Step>
+</Steps>
+
+### Auto-Download from Modrinth
+
+Automatically download Quilt-compatible mods:
+
+```yaml
+environment:
+  TYPE: QUILT
+  VERSION: "1.20.4"
+  MODRINTH_PROJECTS: |
+    qsl
+    lithium
+    phosphor
+```
+
+<Note>
+  When using Quilt, look for mods that explicitly support Quilt or are compatible with both Fabric and Quilt.
+</Note>
+
+## Quilt Standard Libraries (QSL)
+
+QSL is Quilt's equivalent to Fabric API. Many Quilt mods require it:
+
+```yaml
+environment:
+  TYPE: QUILT
+  VERSION: "1.20.4"
+  MODRINTH_PROJECTS: |
+    qsl
+```
+
+## Custom Launcher
+
+### Custom Launcher from URL
+
+```yaml
+environment:
+  TYPE: QUILT
+  QUILT_LAUNCHER_URL: "http://your-server.com/quilt-server-custom.jar"
+```
+
+### Custom Launcher from File
+
+Use a custom launcher JAR (path relative to `/data`):
+
+```yaml
+environment:
+  TYPE: QUILT
+  QUILT_LAUNCHER: "quilt-server-custom.jar"
+volumes:
+  - ./quilt-server-custom.jar:/data/quilt-server-custom.jar
+```
+
+## Popular Quilt Mods
+
+### Essential Libraries
+
+```yaml
+environment:
+  TYPE: QUILT
+  MODRINTH_PROJECTS: |
+    qsl              # Quilt Standard Libraries
+    quilted-fabric-api  # Fabric API compatibility layer
+```
+
+### Performance Optimization
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    qsl
+    lithium          # Server optimization (compatible)
+    phosphor         # Lighting optimization (compatible)
+    ferritecore      # Memory optimization (compatible)
+    krypton          # Network optimization (compatible)
+```
+
+### Server Management
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    qsl
+    luckperms        # Permissions (compatible)
+    chunky           # Pre-generation (compatible)
+```
+
+## Complete Production Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-quilt
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: QUILT
+      VERSION: "1.20.4"
+      QUILT_LOADER_VERSION: "0.16.0"
+      QUILT_INSTALLER_VERSION: "0.4.1"
+      
+      # Auto-install QSL and optimization mods
+      MODRINTH_PROJECTS: |
+        qsl
+        quilted-fabric-api
+        lithium
+        phosphor
+        ferritecore
+        krypton
+      
+      # Server Settings
+      MOTD: "A Quilt Minecraft Server"
+      DIFFICULTY: normal
+      MODE: survival
+      MAX_PLAYERS: 50
+      VIEW_DISTANCE: 12
+      SIMULATION_DISTANCE: 8
+      
+      # Performance
+      MEMORY: 6G
+      USE_AIKAR_FLAGS: "true"
+      
+      # World
+      LEVEL: "world"
+      SEED: "quilt-world"
+      
+      # Security
+      ENABLE_WHITELIST: "false"
+      ONLINE_MODE: "true"
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./config:/data/config
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Fabric Compatibility
+
+### Compatible Fabric Mods
+
+Many Fabric mods work with Quilt:
+
+- Performance mods (Lithium, Phosphor, FerriteCore)
+- Utility mods (LuckPerms, Chunky)
+- Some content mods
+
+### Using Fabric API Compatibility
+
+For Fabric mods that require Fabric API:
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    qsl
+    quilted-fabric-api  # Provides Fabric API compatibility
+```
+
+### Checking Compatibility
+
+<Warning>
+  Always verify mod compatibility:
+  
+  1. Check mod page for Quilt support
+  2. Look for "Fabric" and "Quilt" tags on Modrinth
+  3. Test mods in development environment first
+  4. Check mod dependencies
+</Warning>
+
+## Configuration Files
+
+Quilt mods use the same configuration structure as Fabric:
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./config:/data/config
+```
+
+Configuration files are stored in:
+- `./config/mod-name.toml`
+- `./config/mod-name/`
+
+## Performance Tuning
+
+### Memory Allocation
+
+```yaml
+environment:
+  MEMORY: 6G  # For modded servers with 20-30 players
+  USE_AIKAR_FLAGS: "true"
+```
+
+### Recommended RAM
+
+| Players | Mods | Recommended RAM |
+|---------|------|----------------|
+| 1-10 | Light | 4GB |
+| 10-20 | Medium | 6GB |
+| 20-50 | Medium | 8GB |
+| 50+ | Heavy | 12GB+ |
+
+### Performance Mods
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    qsl
+    lithium        # Overall performance
+    phosphor       # Lighting performance
+    ferritecore    # Memory reduction
+    krypton        # Network performance
+    starlight      # Lighting engine
+```
+
+## Troubleshooting
+
+### Mod Compatibility Issues
+
+**Problem**: Fabric mod not working with Quilt
+
+**Solution**:
+1. Install `quilted-fabric-api`:
+   ```yaml
+   MODRINTH_PROJECTS: |
+     qsl
+     quilted-fabric-api
+   ```
+2. Check mod page for Quilt compatibility
+3. Look for Quilt-specific version of the mod
+
+### Missing QSL
+
+**Problem**: Mods failing to load
+
+**Solution**: Ensure QSL is installed:
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    qsl
+```
+
+### Version Mismatch
+
+**Problem**: Loader version incompatibility
+
+**Solution**: Specify compatible versions:
+```yaml
+environment:
+  VERSION: "1.20.4"
+  QUILT_LOADER_VERSION: "0.16.0"
+```
+
+## Migration Guide
+
+### From Fabric to Quilt
+
+<Steps>
+  <Step title="Backup your server">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Update server type">
+    ```yaml
+    environment:
+      TYPE: QUILT  # Changed from FABRIC
+      VERSION: "1.20.4"
+      MODRINTH_PROJECTS: |
+        qsl
+        quilted-fabric-api  # For Fabric mod compatibility
+    ```
+  </Step>
+  
+  <Step title="Verify mods">
+    Check that your Fabric mods are compatible with Quilt. Most will work with `quilted-fabric-api`.
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+</Steps>
+
+### From Vanilla to Quilt
+
+<Steps>
+  <Step title="Backup your world">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Configure Quilt">
+    ```yaml
+    environment:
+      TYPE: QUILT
+      VERSION: "1.20.4"
+      MODRINTH_PROJECTS: |
+        qsl
+    ```
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Your vanilla world will work with Quilt.
+  </Step>
+</Steps>
+
+<Warning>
+  Players must install Quilt and required mods on their clients to connect to a Quilt server.
+</Warning>
+
+## Quilt vs Fabric
+
+| Feature | Fabric | Quilt |
+|---------|--------|-------|
+| Mod Compatibility | Fabric only | Fabric + Quilt |
+| Update Speed | Fast | Fast |
+| Performance | Excellent | Excellent |
+| Community | Large | Growing |
+| Governance | Centralized | Community-driven |
+| Tooling | Good | Enhanced |
+| API Features | Standard | Extended |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Modrinth Integration" icon="download" href="/mods-and-plugins/modrinth">
+    Auto-download Quilt mods from Modrinth
+  </Card>
+  <Card title="Fabric Server" icon="scissors" href="/server-types/fabric">
+    Compare with Fabric server
+  </Card>
+  <Card title="Mod Configuration" icon="gear" href="/mods-and-plugins/overview">
+    Learn about mod configuration
+  </Card>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Run mods with plugins
+  </Card>
+</CardGroup>

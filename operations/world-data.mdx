@@ -1,0 +1,308 @@
+---
+title: World Data and Saves
+description: Download, clone, and manage Minecraft world data including datapacks and VanillaTweaks
+---
+
+The Minecraft server supports multiple methods for loading world data, from downloading pre-made worlds to cloning from local paths. World files are stored in `/data/$LEVEL` within the container.
+
+## Downloadable Worlds
+
+You can specify a URL to a ZIP or compressed TAR file containing a Minecraft world. The container will download and extract it automatically.
+
+```bash
+docker run -d \
+  -e WORLD=http://www.example.com/worlds/MySave.zip \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+### How It Works
+
+The container:
+1. Downloads the archive from the specified URL
+2. Searches for a `level.dat` file within the archive
+3. Moves the containing subdirectory to `/data/$LEVEL`
+
+<Note>
+  The URL must be accessible from inside the container. Use an IP address, globally resolvable FQDN, or the name of a linked container.
+</Note>
+
+### Multiple level.dat Files
+
+If the archive contains multiple `level.dat` files, specify which one to use:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      WORLD: "http://example.com/worlds/bundle.zip"
+      WORLD_INDEX: "2"  # Defaults to 1
+```
+
+## Cloning from Container Path
+
+The `WORLD` variable can reference a directory, ZIP file, or compressed TAR file to clone or extract.
+
+### Directory Cloning
+
+```bash
+docker run -d \
+  -v $HOME/worlds:/worlds:ro \
+  -e WORLD=/worlds/basic \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+<Warning>
+  Use read-only volume mounts (`:ro`) for world sources to ensure the original remains pristine.
+</Warning>
+
+### Docker Compose Example
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      WORLD: "/worlds/survival"
+    volumes:
+      - ./worlds:/worlds:ro  # Source worlds (read-only)
+      - ./data:/data         # Server data (read-write)
+```
+
+This setup allows you to maintain template worlds in a separate directory:
+
+```
+project/
+├── compose.yaml
+├── worlds/
+│   ├── survival/
+│   │   └── level.dat
+│   └── creative/
+│       └── level.dat
+└── data/           # Active server data
+```
+
+## Force Overwrite on Start
+
+By default, the world is only copied if it doesn't exist. To force overwrite every time:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      WORLD: "/worlds/template"
+      FORCE_WORLD_COPY: "TRUE"
+```
+
+<Warning>
+  Using `FORCE_WORLD_COPY=TRUE` will replace the world on every server start, discarding any changes made during gameplay.
+</Warning>
+
+## Custom Worlds Directory
+
+Some plugins (like Multiverse) support custom world directories. Use the `EXTRA_ARGS` environment variable:
+
+```bash
+docker run -d \
+  -e EXTRA_ARGS='--world-dir ./worlds/' \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+**Supported aliases:**
+- `--world-dir`
+- `--world-container`
+- `-W`
+- `--universe`
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EXTRA_ARGS: "--world-container /data/worlds"
+```
+
+## Datapacks
+
+Datapacks can be installed similarly to mods and plugins. They are placed in `/data/$LEVEL/datapacks`.
+
+### Installation Methods
+
+<CodeGroup>
+```yaml Comma-separated URLs
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      DATAPACKS: "https://example.com/pack1.zip,https://example.com/pack2.zip"
+```
+
+```yaml File List
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      DATAPACKS_FILE: "/config/datapacks.txt"
+    volumes:
+      - ./datapacks.txt:/config/datapacks.txt:ro
+```
+
+```yaml Local Files
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      DATAPACKS: "/datapacks/custom-pack.zip"
+    volumes:
+      - ./my-datapacks:/datapacks:ro
+```
+</CodeGroup>
+
+### Datapack Configuration Variables
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `DATAPACKS` | Comma-separated list of URLs, files, or directories | |
+| `DATAPACKS_FILE` | Text file with one datapack per line | |
+| `REMOVE_OLD_DATAPACKS` | Remove old datapacks on startup | `false` |
+| `REMOVE_OLD_DATAPACKS_DEPTH` | Max depth for removal | `16` |
+| `REMOVE_OLD_DATAPACKS_INCLUDE` | Pattern to include for removal | `*.zip` |
+| `REMOVE_OLD_DATAPACKS_EXCLUDE` | Pattern to exclude from removal | |
+
+### Removing Old Datapacks
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      DATAPACKS: "https://example.com/datapack-v2.zip"
+      REMOVE_OLD_DATAPACKS: "true"
+      REMOVE_OLD_DATAPACKS_INCLUDE: "*.zip"
+```
+
+## VanillaTweaks
+
+[VanillaTweaks](https://vanillatweaks.net/) datapacks, crafting tweaks, and resource packs can be installed using share codes or JSON configuration files.
+
+### Share Code Installation
+
+The share code is the part after the hash in the VanillaTweaks share URL:
+
+```
+https://vanillatweaks.net/share/#MGr52E
+                                 ------
+                                   |
+                                   +-- Share code: MGr52E
+```
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      # Separate codes for DataPacks, CraftingTweaks, and ResourcePacks
+      VANILLATWEAKS_SHARECODE: "MGr52E,tF1zL2,LnEDwT"
+```
+
+<Note>
+  ResourcePacks, DataPacks, and CraftingTweaks each have separate share codes.
+</Note>
+
+### JSON File Configuration
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      VANILLATWEAKS_FILE: "/config/vt-datapacks.json,/config/vt-craftingtweaks.json"
+    volumes:
+      - ./vanillatweaks:/config:ro
+```
+
+#### DataPacks JSON
+
+```json
+{
+  "type": "datapacks",
+  "version": "1.21",
+  "packs": {
+    "gameplay changes": [
+      "graves",
+      "multiplayer sleep",
+      "armored elytra"
+    ],
+    "teleport commands": ["tpa"]
+  }
+}
+```
+
+#### CraftingTweaks JSON
+
+```json
+{
+  "type": "craftingtweaks",
+  "version": "1.21",
+  "packs": {
+    "quality of life": [
+      "dropper to dispenser",
+      "double slabs",
+      "back to blocks"
+    ]
+  }
+}
+```
+
+#### ResourcePacks JSON
+
+```json
+{
+  "type": "resourcepacks",
+  "version": "1.21",
+  "packs": {
+    "aesthetic": [
+      "CherryPicking",
+      "BlackNetherBricks",
+      "AlternateBlockDestruction"
+    ]
+  }
+}
+```
+
+<Note>
+  Datapack names must be lowercase. See the [VanillaTweaks datapacks spec](https://vanillatweaks.net/assets/resources/json/1.21/dpcategories.json) and [crafting tweaks spec](https://vanillatweaks.net/assets/resources/json/1.21/ctcategories.json) for complete lists.
+</Note>
+
+### Automatic Cleanup
+
+VanillaTweaks packs are automatically updated when new versions are retrieved, and old versions are cleaned up automatically.
+
+## Complete Example
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.21"
+      # Clone from template
+      WORLD: "/worlds/template-survival"
+      # Install datapacks
+      DATAPACKS: "https://example.com/custom-datapack.zip"
+      REMOVE_OLD_DATAPACKS: "true"
+      # Install VanillaTweaks
+      VANILLATWEAKS_SHARECODE: "MGr52E"
+    volumes:
+      - ./worlds:/worlds:ro
+      - ./data:/data
+    restart: unless-stopped
+```

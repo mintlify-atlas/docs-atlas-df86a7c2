@@ -1,0 +1,355 @@
+---
+title: Core Environment Variables
+description: Essential environment variables for Docker Minecraft Server configuration
+---
+
+This page documents the core environment variables required to run and configure the Docker Minecraft Server.
+
+## Essential Variables
+
+### EULA
+
+<ParamField path="EULA" type="string" required>
+  You **MUST** set this to `TRUE` to accept the [Minecraft End User License Agreement](https://www.minecraft.net/en-us/eula).
+</ParamField>
+
+<Warning>
+  The server will not start without accepting the EULA. Always include `-e EULA=TRUE` in your commands and container definitions.
+</Warning>
+
+<Tabs>
+  <Tab title="docker run">
+    ```bash
+    docker run -d -it -p 25565:25565 -e EULA=TRUE itzg/minecraft-server
+    ```
+  </Tab>
+  <Tab title="docker compose">
+    ```yaml
+    services:
+      mc:
+        image: itzg/minecraft-server:latest
+        environment:
+          EULA: "TRUE"
+        ports:
+          - "25565:25565"
+    ```
+  </Tab>
+</Tabs>
+
+## Server Type and Version
+
+<ParamField path="TYPE" type="string" default="VANILLA">
+  The server type to run. See the [Server Types](/server-types/overview) documentation for all available options.
+  
+  Common values:
+  - `VANILLA` - Official Minecraft server
+  - `PAPER` - Paper server
+  - `FORGE` - Forge modded server
+  - `FABRIC` - Fabric modded server
+  - `SPIGOT` - Spigot server
+  - `BUKKIT` - Bukkit server
+</ParamField>
+
+<ParamField path="VERSION" type="string" default="LATEST">
+  The Minecraft version to install. Can be:
+  - `LATEST` - Latest stable release
+  - `SNAPSHOT` - Latest snapshot
+  - Specific version like `1.20.4`
+  - Version range like `1.20` for latest 1.20.x
+</ParamField>
+
+```yaml Example
+environment:
+  TYPE: PAPER
+  VERSION: "1.20.4"
+```
+
+## User and Group Settings
+
+By default, the container runs the Minecraft server as user ID 1000 and group ID 1000.
+
+<ParamField path="UID" type="number" default="1000">
+  The Linux user ID to run the server as
+</ParamField>
+
+<ParamField path="GID" type="number" default="1000">
+  The Linux group ID to run the server as
+</ParamField>
+
+<Note>
+  User switching is skipped if the `--user`/`-u` argument is passed to `docker run` or `user` is set on the compose service.
+</Note>
+
+```yaml Example
+environment:
+  UID: 1001
+  GID: 1001
+```
+
+## Memory Configuration
+
+By default, the image sets both initial and maximum Java heap limits to 1 GB.
+
+<ParamField path="MEMORY" type="string" default="1G">
+  Sets both initial (`Xms`) and max (`Xmx`) memory heap settings. 
+  
+  Supports formats:
+  - Absolute: `1G`, `2048M`, `512M`
+  - Percentage: `50%`, `75%`
+</ParamField>
+
+<ParamField path="INIT_MEMORY" type="string">
+  Independently sets the initial heap size (overrides MEMORY for Xms)
+</ParamField>
+
+<ParamField path="MAX_MEMORY" type="string">
+  Independently sets the max heap size (overrides MEMORY for Xmx)
+</ParamField>
+
+<Tabs>
+  <Tab title="Simple Memory">
+    ```yaml
+    environment:
+      MEMORY: 2G
+    ```
+  </Tab>
+  <Tab title="Separate Init/Max">
+    ```yaml
+    environment:
+      INIT_MEMORY: 1G
+      MAX_MEMORY: 4G
+    ```
+  </Tab>
+  <Tab title="Percentage">
+    ```yaml
+    environment:
+      MEMORY: 75%
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Percentage-based heap sizing uses `-XX:InitialRAMPercentage` for `INIT_MEMORY` and `-XX:MaxRAMPercentage` for `MAX_MEMORY`.
+</Note>
+
+To let the JVM calculate heap size from the container's memory limit, unset MEMORY:
+
+```bash
+docker run -d -e MEMORY="" ...
+```
+
+<Warning>
+  Memory settings only control Java **heap** limits. Container resource requests should account for non-heap usage. An extra 25% is [a general best practice](https://dzone.com/articles/best-practices-java-memory-arguments-for-container).
+</Warning>
+
+## Timezone Configuration
+
+<ParamField path="TZ" type="string" default="UTC">
+  Set the timezone to match your locale. Use standard timezone names like `America/New_York` or `Europe/London`.
+</ParamField>
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```bash
+    docker run -d -e TZ=Europe/London ...
+    ```
+  </Tab>
+  <Tab title="Volume Mount">
+    ```bash
+    docker run -d -v /etc/timezone:/etc/timezone:ro ...
+    ```
+    
+    <Note>Not supported on Windows</Note>
+  </Tab>
+</Tabs>
+
+## Locale Settings
+
+<ParamField path="LC_ALL" type="string" default="en_US.UTF-8">
+  System locale setting. Set in the Dockerfile and generally should not be changed.
+</ParamField>
+
+## Data Directory
+
+The Minecraft server stores all data in the container's `/data` directory.
+
+<Note>
+  Always mount a volume to `/data` to persist your world saves, configurations, and other server data.
+</Note>
+
+<CodeGroup>
+```bash docker run
+docker run -d \
+  -v /path/on/host:/data \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+```yaml docker compose
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    environment:
+      EULA: "TRUE"
+    volumes:
+      - ./data:/data
+```
+</CodeGroup>
+
+## Logging Options
+
+<ParamField path="LOG_TIMESTAMP" type="boolean" default="false">
+  Include timestamps in init logs (logs before the Minecraft server starts)
+</ParamField>
+
+<ParamField path="DEBUG" type="boolean" default="false">
+  Enable debug logging for container startup diagnostics
+</ParamField>
+
+```bash Example
+[init] 2022-02-05 16:58:33+00:00 Starting the Minecraft server...
+```
+
+## Server Behavior
+
+<ParamField path="SETUP_ONLY" type="boolean" default="false">
+  Setup server files and stop before launching the server process. Useful for host-attached data directories.
+</ParamField>
+
+<ParamField path="FORCE_REDOWNLOAD" type="boolean" default="false">
+  Force re-download of the server file. Works with VANILLA, FORGE, BUKKIT, SPIGOT, PAPER, CURSEFORGE, SPONGEVANILLA types.
+</ParamField>
+
+```yaml Example
+environment:
+  TYPE: PAPER
+  FORCE_REDOWNLOAD: "true"
+```
+
+## Server Shutdown
+
+<ParamField path="STOP_DURATION" type="number" default="60">
+  How long (in seconds) to wait for the server process to gracefully finish after sending the stop command
+</ParamField>
+
+<ParamField path="STOP_SERVER_ANNOUNCE_DELAY" type="number">
+  Number of seconds to delay after posting shutdown announcement to allow players to finish activities
+</ParamField>
+
+<Warning>
+  The Docker stop grace period must be longer than the announce delay. Increase it using [the -t option](https://docs.docker.com/compose/reference/down/) or set [stop_grace_period](https://docs.docker.com/compose/compose-file/05-services/#stop_grace_period) in compose.
+</Warning>
+
+Bypass the announce delay by sending `SIGUSR1`:
+
+```bash
+docker stop --signal SIGUSR1 mc
+# or
+docker compose kill --signal SIGUSR1
+```
+
+## Console Options
+
+<ParamField path="CONSOLE" type="boolean" default="true">
+  Some older Spigot versions (pre-1.14) require `--noconsole` when detaching stdin. Set to `false` for those versions.
+</ParamField>
+
+<ParamField path="GUI" type="boolean" default="true">
+  Explicitly disable GUI. Some older servers get confused and think GUI is enabled.
+</ParamField>
+
+<Note>
+  When RCON is enabled (default) and [TTY](https://docs.docker.com/compose/compose-file/05-services/#tty) is enabled, some server types output colorized logs and provide interactive console. Access with `docker attach` and detach using Control-P, Control-Q.
+</Note>
+
+## Network and Proxy
+
+<ParamField path="PROXY" type="string">
+  HTTP/HTTPS proxy host:port
+</ParamField>
+
+<ParamField path="PROXY_HOST" type="string">
+  Proxy host (alternative to PROXY)
+</ParamField>
+
+<ParamField path="PROXY_PORT" type="string">
+  Proxy port (alternative to PROXY)
+</ParamField>
+
+<ParamField path="PROXY_NON_PROXY_HOSTS" type="string">
+  Pipe-delimited list of hosts to exclude from proxying
+</ParamField>
+
+## Health Monitoring
+
+<ParamField path="SERVER_HOST" type="string" default="localhost">
+  Host address for health monitoring
+</ParamField>
+
+<ParamField path="SERVER_PORT" type="number" default="25565">
+  Port number for health monitoring (not the same as the server port mapping)
+</ParamField>
+
+## Extra Arguments
+
+<ParamField path="EXTRA_ARGS" type="string">
+  Additional arguments passed to the server JAR file (arguments after the filename)
+</ParamField>
+
+```yaml Example
+environment:
+  EXTRA_ARGS: "--world-dir /worlds"
+```
+
+## Custom Server JAR
+
+<ParamField path="CUSTOM_SERVER" type="string">
+  URL or container path to a custom server JAR. Requires `TYPE=CUSTOM`.
+</ParamField>
+
+```yaml Example
+environment:
+  TYPE: CUSTOM
+  CUSTOM_SERVER: https://example.com/my-server.jar
+```
+
+<Note>
+  The JAR is only downloaded if it doesn't exist in `/data`. To upgrade, stop the container, remove the file, and restart.
+</Note>
+
+## Complete Example
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      # Required
+      EULA: "TRUE"
+      
+      # Server Type & Version
+      TYPE: PAPER
+      VERSION: "1.20.4"
+      
+      # Resources
+      MEMORY: 4G
+      
+      # User Settings
+      UID: 1000
+      GID: 1000
+      
+      # Timezone
+      TZ: America/New_York
+      
+      # Logging
+      LOG_TIMESTAMP: "true"
+      
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```

@@ -1,0 +1,296 @@
+---
+title: GregTech New Horizons (GTNH)
+description: Auto-setup and manage GTNH servers with specialized configuration
+---
+
+[GT New Horizons (GTNH)](https://www.gtnewhorizons.com/) is a Minecraft 1.7.10 modpack maintained and supported by dedicated community members. With over 10 years in development, GTNH offers a carefully balanced and immersive experience to challenge players as they climb through the 15 tiers of technology.
+
+The ultimate goal of GTNH is to build the Stargate, an interdimensional teleporter and the symbol for absolute prestige, aptitude, and determination.
+
+As GTNH is a complex modpack with specific requirements, it has its own `TYPE` to simplify deployment and updates.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `GTNH` |
+| `GTNH_PACK_VERSION` | `latest` | Modpack version: `latest`, `latest-dev`, or specific version |
+| `GTNH_DELETE_BACKUPS` | `false` | Delete config backup folders on startup |
+| `SKIP_GTNH_UPDATE_CHECK` | `false` | Prevent update checks from running |
+
+## Pack Version Selection
+
+As GTNH is a Minecraft 1.7.10 modpack, your Minecraft version is automatically set to 1.7.10. The [modpack version](https://www.gtnewhorizons.com/downloads/) can be selected by setting `GTNH_PACK_VERSION`:
+
+### latest
+
+Automatically selects the latest full release version and deploys the server with it. This will also automatically update the server on startup.
+
+```yaml
+GTNH_PACK_VERSION: latest
+```
+
+### latest-dev
+
+Selects the latest version marked as beta or RC. Won't select a full release version even if newer.
+
+```yaml
+GTNH_PACK_VERSION: latest-dev
+```
+
+### Specific Version (Recommended)
+
+Set to a specific version like `2.8.1` to manage updates manually:
+
+```yaml
+GTNH_PACK_VERSION: "2.8.1"
+```
+
+<Note>
+Using a specific version is recommended for production servers to prevent unexpected updates.
+</Note>
+
+## Preventing Updates
+
+To actively prevent an update from happening:
+
+```yaml
+SKIP_GTNH_UPDATE_CHECK: "true"
+```
+
+<Warning>
+Only set this **after** the initial setup. Setting it before will prevent the server install from running.
+</Warning>
+
+## Resource Requirements
+
+### Recommended Minimum
+
+- **CPU**: 2-4 cores
+- **RAM**: 
+  - 6GB + 0.5GB per extra player (early game)
+  - 6GB + 1GB per extra player (~UV tier+)
+- **Storage**: 20GB+ (HDD feasible, SSD preferred)
+
+For more details, consult the [modpack wiki](https://wiki.gtnewhorizons.com/wiki/Server_Setup).
+
+## Java Version
+
+GTNH supports Java 8 and Java 17+ (Java 17+ is always recommended for maximum performance).
+
+### Recommended Images
+
+- **Java 25** (optimal): For GTNH 2.8.0 and later
+  ```yaml
+  image: itzg/minecraft-server:java25
+  ```
+
+- **Java 17**: For good performance
+  ```yaml
+  image: itzg/minecraft-server:java17
+  ```
+
+- **Java 8**: Legacy support
+  ```yaml
+  image: itzg/minecraft-server:java8
+  ```
+
+<Note>
+For optimal performance, choose Java 25 with GTNH 2.8.0 and later.
+</Note>
+
+## Examples
+
+<CodeGroup>
+```yaml Recommended Setup (Java 25)
+services:
+  mc:
+    image: itzg/minecraft-server:java25
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: GTNH
+      GTNH_PACK_VERSION: "2.8.1"
+      MEMORY: 6G
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+
+```yaml Auto-updating (Latest)
+services:
+  mc:
+    image: itzg/minecraft-server:java25
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: GTNH
+      GTNH_PACK_VERSION: latest
+      MEMORY: 6G
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+
+```yaml With Cleanup Options
+services:
+  mc:
+    image: itzg/minecraft-server:java25
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: GTNH
+      GTNH_PACK_VERSION: "2.8.1"
+      GTNH_DELETE_BACKUPS: "true"
+      MEMORY: 6G
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+
+```yaml With Additional Mods
+services:
+  mc:
+    image: itzg/minecraft-server:java25
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: GTNH
+      GTNH_PACK_VERSION: "2.8.1"
+      MEMORY: 6G
+      # Additional mods from https://wiki.gtnewhorizons.com/wiki/Additional_Mods
+      MODS: |
+        https://github.com/Kynake/BetterFoliage/releases/download/1.2.1/BetterFoliage-LegacyEdition-1.2.1.jar
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+</CodeGroup>
+
+## Config Backups
+
+During version upgrades, the server replaces all config files to ensure new features are set up as intended. Old config files are stored in backup folders in the data directory for reference when manually reapplying your settings.
+
+To delete all backup folders at startup:
+
+```yaml
+environment:
+  GTNH_DELETE_BACKUPS: "true"
+```
+
+## Server Properties Defaults
+
+To deliver the intended GTNH experience, the following options are automatically set in `server.properties`:
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| `LEVEL_TYPE` | `rwg` | Realistic World Generation |
+| `DIFFICULTY` | `hard` | Hard difficulty |
+| `ALLOW_FLIGHT` | `true` | Allow flying (required for some mods) |
+| `ENABLE_COMMAND_BLOCK` | `true` | Enable command blocks |
+| `MOTD` | `Greg Tech New Horizon <version>` | Server MOTD |
+
+<Note>
+It's recommended to leave these as-is, but you can override them if you know what you're doing.
+</Note>
+
+## Java Arguments
+
+The server automatically uses optimized Java arguments based on the Java version:
+
+### Java 17+
+
+```
+-Dfml.readTimeout=180 @java9args.txt -jar lwjgl3ify-forgePatches.jar
+```
+
+### Java 8
+
+```
+-XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+UseCodeCacheFlushing -Dfml.readTimeout=180 -jar forge-1.7.10-10.13.4.1614-1.7.10-universal.jar
+```
+
+## Additional Mods
+
+GTNH supports additional optional mods. See the [Additional Mods wiki page](https://wiki.gtnewhorizons.com/wiki/Additional_Mods) for recommended mods.
+
+Add mods using the `MODS` environment variable:
+
+```yaml
+environment:
+  MODS: |
+    https://github.com/Kynake/BetterFoliage/releases/download/1.2.1/BetterFoliage-LegacyEdition-1.2.1.jar
+```
+
+## Upgrading
+
+### Automatic Upgrades
+
+If using `latest` or `latest-dev`, simply restart the container:
+
+```bash
+docker compose restart mc
+```
+
+### Manual Version Upgrades
+
+<Steps>
+  <Step title="Update version">
+    Edit your `compose.yaml` and update `GTNH_PACK_VERSION`
+  </Step>
+  
+  <Step title="Recreate container">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Review config changes">
+    Check the config backup folders for any custom settings to reapply
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Server won't start
+
+- Verify you're using a supported Java version (8 or 17+)
+- Check that you have allocated sufficient memory (minimum 6GB)
+- Ensure `SKIP_GTNH_UPDATE_CHECK` is not set during initial setup
+
+### Performance Issues
+
+- Upgrade to Java 25 for GTNH 2.8.0+
+- Increase `MEMORY` allocation
+- Use SSD storage instead of HDD
+- Allocate more CPU cores
+
+### Config changes not persisting
+
+- Remember that config files are replaced during upgrades
+- Use the backup folders to identify and reapply your custom settings
+- Consider setting `GTNH_DELETE_BACKUPS` to `false` until you've restored your settings
+
+<Note>
+For comprehensive setup guidance, consult the [official GTNH wiki](https://wiki.gtnewhorizons.com/wiki/Server_Setup).
+</Note>

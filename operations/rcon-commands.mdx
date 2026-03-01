@@ -1,0 +1,366 @@
+---
+title: RCON Command Automation
+description: Automatically execute RCON commands on server events like startup, player connect, and player disconnect
+---
+
+RCON commands can be configured to execute automatically when specific server events occur, such as server startup, player connections, or player disconnections. This enables powerful automation for server management, gameplay modifications, and player interactions.
+
+## Event Types
+
+RCON commands can be triggered on these events:
+
+- **Server startup** - Commands run once when the server starts
+- **Client connect** - Commands run when any player connects
+- **Client disconnect** - Commands run when any player disconnects
+- **First client connect** - Commands run when the first player joins an empty server
+- **Last client disconnect** - Commands run when the last player leaves
+
+## Configuration Variables
+
+| Variable | Trigger | Description |
+|----------|---------|-------------|
+| `RCON_CMDS_STARTUP` | Server start | Commands executed once on server startup |
+| `RCON_CMDS_ON_CONNECT` | Player joins | Commands executed when any player connects |
+| `RCON_CMDS_ON_DISCONNECT` | Player leaves | Commands executed when any player disconnects |
+| `RCON_CMDS_FIRST_CONNECT` | First player joins | Commands executed when first player joins empty server |
+| `RCON_CMDS_LAST_DISCONNECT` | Last player leaves | Commands executed when last player leaves server |
+
+<Note>
+  When declaring multiple commands in a compose file, use YAML's `|-` [block style indicator](https://yaml-multiline.info/) for better readability.
+</Note>
+
+## Server Startup Commands
+
+Execute commands once when the server starts:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      RCON_CMDS_STARTUP: |-
+        gamerule doFireTick false
+        pregen start 200
+        time set day
+```
+
+### Common Startup Use Cases
+
+<CodeGroup>
+```yaml Configure Game Rules
+RCON_CMDS_STARTUP: |-
+  gamerule keepInventory true
+  gamerule mobGriefing false
+  gamerule doFireTick false
+  difficulty normal
+```
+
+```yaml Pre-generate Chunks
+RCON_CMDS_STARTUP: |-
+  pregen start 200
+  gamerule randomTickSpeed 0
+```
+
+```yaml Initialize Teams
+RCON_CMDS_STARTUP: |-
+  team add Red
+  team add Blue
+  team modify Red color red
+  team modify Blue color blue
+```
+</CodeGroup>
+
+## Player Connection Commands
+
+Execute commands when any player connects to the server:
+
+```yaml
+environment:
+  RCON_CMDS_ON_CONNECT: |-
+    team join New @a[team=]
+    give @a[team=New] diamond 1
+```
+
+<Warning>
+  On client connect, you only know there was a connection, not which specific player connected. Use RCON selector commands like `@a[team=]` to target players.
+</Warning>
+
+### Connection Use Cases
+
+<CodeGroup>
+```yaml Welcome New Players
+RCON_CMDS_ON_CONNECT: |-
+  team join New @a[team=]
+  give @a[team=New] wooden_sword
+  give @a[team=New] bread 16
+  team join Old @a[team=New]
+```
+
+```yaml Auto-Teleport
+RCON_CMDS_ON_CONNECT: |-
+  team join Spawning @a[team=]
+  tp @a[team=Spawning] 0 64 0
+  team join Playing @a[team=Spawning]
+```
+
+```yaml Broadcast
+RCON_CMDS_ON_CONNECT: |-
+  say A player has joined the server!
+  playsound minecraft:entity.player.levelup master @a
+```
+</CodeGroup>
+
+## Player Disconnect Commands
+
+Execute commands when any player disconnects:
+
+```yaml
+environment:
+  RCON_CMDS_ON_DISCONNECT: |-
+    say A player has left the server
+    gamerule doFireTick true
+```
+
+### Disconnect Use Cases
+
+```yaml
+environment:
+  RCON_CMDS_ON_DISCONNECT: |-
+    say Goodbye, player!
+    # Clean up temporary entities
+    kill @e[type=item,distance=..100]
+```
+
+## First Player Connect
+
+Execute commands when the first player joins an empty server:
+
+```yaml
+environment:
+  RCON_CMDS_FIRST_CONNECT: |-
+    pregen stop
+    gamerule randomTickSpeed 3
+    say Server is now active!
+```
+
+### First Connect Use Cases
+
+<CodeGroup>
+```yaml Resume from Idle
+RCON_CMDS_FIRST_CONNECT: |-
+  pregen stop
+  gamerule doMobSpawning true
+  gamerule randomTickSpeed 3
+  weather clear
+```
+
+```yaml Initialize Session
+RCON_CMDS_FIRST_CONNECT: |-
+  scoreboard objectives add Session dummy
+  scoreboard players add SessionCount Session 1
+  say Welcome to session #$(scoreboard players get SessionCount Session)!
+```
+</CodeGroup>
+
+## Last Player Disconnect
+
+Execute commands when the last player leaves the server:
+
+```yaml
+environment:
+  RCON_CMDS_LAST_DISCONNECT: |-
+    kill @e[type=minecraft:boat]
+    pregen start 200
+    save-all
+```
+
+### Last Disconnect Use Cases
+
+<CodeGroup>
+```yaml Cleanup and Maintenance
+RCON_CMDS_LAST_DISCONNECT: |-
+  kill @e[type=item]
+  kill @e[type=minecraft:boat]
+  save-all
+  say Server entering idle mode
+```
+
+```yaml Energy Saving
+RCON_CMDS_LAST_DISCONNECT: |-
+  gamerule doMobSpawning false
+  gamerule randomTickSpeed 0
+  kill @e[type=!player]
+```
+
+```yaml Continue Pre-generation
+RCON_CMDS_LAST_DISCONNECT: |-
+  pregen start 200
+  gamerule doFireTick false
+```
+</CodeGroup>
+
+## Complete Example: New Player Management
+
+This example uses teams to track and welcome new players:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.4"
+      
+      # Initialize teams on startup
+      RCON_CMDS_STARTUP: |-
+        /pregen start 200
+        /gamerule doFireTick false
+        /team add New
+        /team add Old
+      
+      # Welcome new players with starter items
+      RCON_CMDS_ON_CONNECT: |-
+        /team join New @a[team=]
+        /give @a[team=New] birch_boat
+        /give @a[team=New] bread 16
+        /team join Old @a[team=New]
+      
+      # Stop pre-generation when first player joins
+      RCON_CMDS_FIRST_CONNECT: |-
+        /pregen stop
+        /gamerule doFireTick true
+      
+      # Cleanup and restart pre-gen when last player leaves
+      RCON_CMDS_LAST_DISCONNECT: |-
+        /kill @e[type=minecraft:boat]
+        /save-all
+        /pregen start 200
+        /gamerule doFireTick false
+    
+    volumes:
+      - ./data:/data
+```
+
+### How This Example Works
+
+<Steps>
+  <Step title="Server starts">
+    Creates "New" and "Old" teams, starts chunk pre-generation, disables fire spread.
+  </Step>
+  
+  <Step title="First player joins">
+    Stops pre-generation, enables fire spread.
+  </Step>
+  
+  <Step title="Player connects">
+    If player has no team (new player), joins them to "New" team, gives starter items, then moves to "Old" team.
+  </Step>
+  
+  <Step title="Last player leaves">
+    Cleans up boats, saves world, restarts pre-generation, disables fire spread.
+  </Step>
+</Steps>
+
+## Advanced Examples
+
+### Dynamic Difficulty Scaling
+
+```yaml
+environment:
+  RCON_CMDS_FIRST_CONNECT: |-
+    difficulty easy
+  
+  RCON_CMDS_ON_CONNECT: |-
+    execute store result score PlayerCount global if entity @a
+    execute if score PlayerCount global matches 3.. run difficulty normal
+    execute if score PlayerCount global matches 5.. run difficulty hard
+  
+  RCON_CMDS_ON_DISCONNECT: |-
+    execute store result score PlayerCount global if entity @a
+    execute if score PlayerCount global matches ..2 run difficulty easy
+    execute if score PlayerCount global matches 3..4 run difficulty normal
+```
+
+### Auto-Save on Disconnect
+
+```yaml
+environment:
+  RCON_CMDS_ON_DISCONNECT: |-
+    save-all
+    say World saved!
+  
+  RCON_CMDS_LAST_DISCONNECT: |-
+    save-all
+    say All players gone. World saved and entering idle mode.
+```
+
+### Timed Events on First Join
+
+```yaml
+environment:
+  RCON_CMDS_FIRST_CONNECT: |-
+    schedule function mypack:start_event 100t
+    say Event starting in 5 seconds!
+    gamerule doDaylightCycle true
+```
+
+## Troubleshooting
+
+### Commands Not Executing
+
+Verify RCON is enabled and check command syntax:
+
+```bash
+# Check RCON connection
+docker exec mc rcon-cli ping
+
+# Test command manually
+docker exec mc rcon-cli "gamerule doFireTick false"
+
+# View logs for RCON errors
+docker logs mc | grep -i rcon
+```
+
+### YAML Syntax Issues
+
+Ensure proper YAML formatting:
+
+```yaml
+# Correct: Use |- for multi-line
+RCON_CMDS_STARTUP: |-
+  command1
+  command2
+
+# Incorrect: Don't use quotes with |-
+RCON_CMDS_STARTUP: "|-
+  command1"
+```
+
+### Commands with Special Characters
+
+Escape or quote commands with special characters:
+
+```yaml
+RCON_CMDS_STARTUP: |-
+  say Welcome to "My Server"!
+  tellraw @a {"text":"Hello World","color":"gold"}
+```
+
+## Best Practices
+
+1. **Test commands manually** before automating them
+2. **Use block style (`|-`)** for readability with multiple commands
+3. **Be cautious with destructive commands** like `/kill` or `/clear`
+4. **Log important actions** using `/say` for debugging
+5. **Combine with scoreboard** for advanced logic
+6. **Use selectors properly** since player names aren't available on connect events
+
+## Reference
+
+For RCON command syntax, see:
+- [Minecraft Commands](https://minecraft.wiki/w/Commands)
+- [Target Selectors](https://minecraft.wiki/w/Target_selectors)
+- [Game Rules](https://minecraft.wiki/w/Game_rule)

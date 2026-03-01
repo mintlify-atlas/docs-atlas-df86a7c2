@@ -1,0 +1,258 @@
+---
+title: Mods & Plugins Overview
+description: Learn how to manage mods and plugins for your Minecraft server
+---
+
+## Modpack Platforms
+
+The easiest way to work with mods and plugins, especially large numbers of them, is to utilize modpacks with one of the supported modpack platforms:
+
+- [Modrinth Modpacks](/mod-platforms/modrinth)
+- [CurseForge Modpacks](/mod-platforms/curseforge)
+- [Feed the Beast](/mod-platforms/ftb)
+
+## Download Automation
+
+This image provides several automated download options for mods and plugins:
+
+- **[Modrinth](/mods-plugins/modrinth-mods)** - Auto-download from Modrinth's open source platform
+- **[CurseForge](/mods-plugins/curseforge-files)** - Auto-download from CurseForge
+- **[Spiget](/mods-plugins/spiget)** - Auto-download SpigotMC plugins
+- **[Packwiz](/mods-plugins/packwiz)** - Use packwiz modpack definitions
+- **[Generic Packs](/mods-plugins/generic-packs)** - Install from zip/tgz archives
+
+## Mods vs Plugins
+
+Understanding the difference between mods and plugins is important:
+
+**Mods** are used by server types that run client-side to modify rendering, add new blocks, and add behaviors:
+- [Forge](/server-types/forge)
+- [Fabric](/server-types/fabric)
+- [Quilt](/server-types/quilt)
+
+Mods typically need to be installed on both client and server, though some are server-only.
+
+**Plugins** are used by server types that **only run on servers** to add behaviors and commands:
+- [Paper](/server-types/paper)
+- [Bukkit/Spigot](/server-types/bukkit-spigot)
+
+Plugins only need to be installed on the server and are never needed on the client.
+
+**Hybrid Servers** like Magma can use both mods and plugins simultaneously.
+
+## Volume Mount Points
+
+You can attach volumes to supply content that will be copied into the server:
+
+### /plugins
+
+Content in this directory is synchronized into `/data/plugins` for plugin-based server types.
+
+<CodeGroup>
+```yaml Docker Compose
+volumes:
+  - ./plugins:/plugins:ro
+```
+
+```bash Docker Run
+-v ./plugins:/plugins:ro
+```
+</CodeGroup>
+
+<Note>
+For special cases:
+- Change source with `COPY_PLUGINS_SRC`
+- Change destination with `COPY_PLUGINS_DEST`
+- For hybrid mod loaders like Cardboard, set `USES_PLUGINS=true`
+</Note>
+
+**Example: Using Cardboard plugins with Fabric**
+
+```yaml
+environment:
+  EULA: "TRUE"
+  TYPE: "FABRIC"
+  MODRINTH_PROJECTS: |
+    fabric-api
+    cardboard
+  USES_PLUGINS: true
+```
+
+### /mods
+
+Content in this directory is synchronized into `/data/mods` for mod-based server types.
+
+<CodeGroup>
+```yaml Docker Compose
+volumes:
+  - ./mods:/mods:ro
+```
+
+```bash Docker Run
+-v ./mods:/mods:ro
+```
+</CodeGroup>
+
+<Note>
+For special cases:
+- Change source with `COPY_MODS_SRC`
+- Change destination with `COPY_MODS_DEST`
+</Note>
+
+### /config
+
+Contents are synchronized into `/data/config` by default.
+
+<CodeGroup>
+```yaml Docker Compose
+volumes:
+  - ./config:/config:ro
+environment:
+  # Optional: copy directly to /data instead
+  COPY_CONFIG_DEST: /data
+```
+
+```bash Docker Run
+-v ./config:/config:ro -e COPY_CONFIG_DEST=/data
+```
+</CodeGroup>
+
+<Note>
+Configuration options:
+- Change source with `COPY_CONFIG_SRC`
+- Change destination with `COPY_CONFIG_DEST`
+- Set `SYNC_SKIP_NEWER_IN_DESTINATION=false` to prioritize `/config` files over newer destination files
+</Note>
+
+By default, environment variable processing is performed on synchronized files matching suffixes in `REPLACE_ENV_SUFFIXES` (default: "yml,yaml,txt,cfg,conf,properties,hjson,json,tml,toml"). Disable with `REPLACE_ENV_DURING_SYNC=false`.
+
+### Multiple Source Directories
+
+`COPY_PLUGINS_SRC`, `COPY_MODS_SRC`, and `COPY_CONFIG_SRC` can each be set to a comma or newline delimited list of container directories.
+
+```yaml
+environment:
+  TYPE: PAPER
+  # Multiple plugin sources
+  COPY_PLUGINS_SRC: /plugins-common,/plugins-local
+volumes:
+  - mc-data:/data
+  # Shared directory used by several projects
+  - ../plugins-common:/plugins-common:ro
+  # Plugins unique to this project
+  - ./plugins:/plugins-local:ro
+```
+
+## Removing Old Mods/Plugins
+
+To remove old mods/plugins before copying new content, set `REMOVE_OLD_MODS=TRUE`.
+
+```bash
+-e REMOVE_OLD_MODS=TRUE
+```
+
+Fine-tune the removal process:
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `REMOVE_OLD_MODS_INCLUDE` | Comma-separated glob patterns to include | `*.jar` |
+| `REMOVE_OLD_MODS_EXCLUDE` | Comma-separated glob patterns to exclude | None |
+| `REMOVE_OLD_MODS_DEPTH` | Maximum directory depth | `16` |
+
+**Example: Remove only jar files in top-level directory**
+
+```bash
+-e REMOVE_OLD_MODS=TRUE \
+-e REMOVE_OLD_MODS_INCLUDE="*.jar" \
+-e REMOVE_OLD_MODS_DEPTH=1
+```
+
+<Warning>
+Excluding a directory will exclude it and all of its contents.
+</Warning>
+
+## Individual Mods/Plugins List
+
+Download or copy individual mods/plugins using `MODS` or `PLUGINS` environment variables.
+
+Each can be a comma or newline delimited list of:
+- URL of a jar file
+- Container path to a jar file
+- Container path to a directory containing jar files
+
+<CodeGroup>
+```bash Docker Run
+-e MODS=https://www.example.com/mods/mod1.jar,/plugins/common,/plugins/special/mod2.jar
+```
+
+```yaml Docker Compose
+environment:
+  PLUGINS: |
+    https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot
+    https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot
+```
+</CodeGroup>
+
+<Note>
+**Auto-removal:** Entries removed from the `MODS` or `PLUGINS` list will be automatically removed from the `mods` or `plugins` directory. An empty list removes all mods/plugins.
+
+**Disable processing:** Comment out the `MODS` or `PLUGINS` environment variable to temporarily disable processing.
+</Note>
+
+## URL Listing Files
+
+As an alternative to `MODS`/`PLUGINS`, use `MODS_FILE` or `PLUGINS_FILE` with the container path or URL of a text file listing mod/plugin URLs.
+
+```bash
+-e MODS_FILE=/extras/mods.txt
+```
+
+**Example listing file:**
+
+```text
+https://edge.forgecdn.net/files/2965/233/Bookshelf-1.15.2-5.6.40.jar
+https://edge.forgecdn.net/files/2926/27/ProgressiveBosses-2.1.5-mc1.15.2.jar
+# This and next line are ignored
+#https://edge.forgecdn.net/files/3248/905/goblintraders-1.3.1-1.15.2.jar
+https://edge.forgecdn.net/files/3272/32/jei-1.15.2-6.0.3.16.jar
+https://edge.forgecdn.net/files/2871/647/ToastControl-1.15.2-3.0.1.jar
+```
+
+<Note>
+Blank lines and lines starting with `#` are ignored.
+</Note>
+
+## Applying Extra Configuration Files
+
+Download or copy additional configuration files before server startup using `APPLY_EXTRA_FILES`.
+
+The format uses `<` to separate destination path and source URL/path. Destination paths are relative to `/data`.
+
+<CodeGroup>
+```bash Docker Run
+-e APPLY_EXTRA_FILES="destination<source_url,destination2<source_url2"
+```
+
+```yaml Docker Compose
+environment:
+  APPLY_EXTRA_FILES: |
+    destination<source1_url
+    destination2<source2_path
+```
+</CodeGroup>
+
+<Note>
+`APPLY_EXTRA_FILES` is processed before [patch processing](/configuration/interpolation#patching-files), so it can provide baseline files to be patched at runtime.
+</Note>
+
+## Zip File Modpack
+
+Specify a URL or container path of a "mod pack" to download and install into `mods` for Forge/Fabric or `plugins` for Bukkit/Spigot.
+
+```bash
+-e MODPACK=http://www.example.com/mods/modpack.zip
+```
+
+<Warning>
+The referenced URL/file must be a zip file with one or more jar files at the top level. Ensure jars are compatible with your server `TYPE`.
+</Warning>

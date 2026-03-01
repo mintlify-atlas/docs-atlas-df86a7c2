@@ -1,0 +1,295 @@
+---
+title: CurseForge Files
+description: Auto-download mods and plugins from CurseForge
+---
+
+Mods and plugins can be auto-downloaded and upgraded from CurseForge by setting `CURSEFORGE_FILES` to a comma or space delimited list of project-file references.
+
+References removed from the declaration are automatically cleaned up. Setting `CURSEFORGE_FILES` to an empty string removes all previously managed project-files.
+
+<Warning>
+**CurseForge API key required**
+
+A CurseForge API key must be allocated and set with `CF_API_KEY` (or `CF_API_KEY_FILE`) as described in [CurseForge modpacks documentation](/mod-platforms/auto-curseforge).
+</Warning>
+
+## Project-File References
+
+CurseForge refers to mod/plugin versions broadly as "files" rather than "versions". Individual project files typically represent a version of the mod/plugin.
+
+The following formats are supported:
+
+| Format | Description | Example |
+|--------|-------------|----------|
+| Project page URL | Auto-selects newest applicable file | `https://www.curseforge.com/minecraft/mc-mods/jei` |
+| File page URL | Specific file | `https://www.curseforge.com/minecraft/mc-mods/jei/files/4593548` |
+| Project slug | Auto-selects newest applicable file | `jei` |
+| Project ID | Auto-selects newest applicable file | `238222` |
+| Project:File | Project slug/ID and file ID | `jei:4593548` or `238222:4593548` |
+| Project@Filename | Project slug/ID and partial filename | `jei@10.2.1.1005` |
+| @Listing file | Path to a listing file | `@/extras/cf-mods.txt` |
+
+<Note>
+When a specific file is omitted, the newest version is auto-selected based on your server's `VERSION` and `TYPE`.
+</Note>
+
+## Basic Usage
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  CF_API_KEY: ${CF_API_KEY}
+  TYPE: FORGE
+  VERSION: "1.20.1"
+  CURSEFORGE_FILES: |
+    jei
+    geckolib
+    aquaculture
+```
+
+```bash Docker Run
+-e CF_API_KEY=$CF_API_KEY \
+-e TYPE=FORGE \
+-e VERSION="1.20.1" \
+-e CURSEFORGE_FILES="jei,geckolib,aquaculture"
+```
+</CodeGroup>
+
+## Using Specific Versions
+
+Reference specific file versions using file IDs or partial filenames:
+
+```yaml
+environment:
+  CURSEFORGE_FILES: |
+    jei:4593548
+    geckolib@4.2.4
+    aquaculture
+```
+
+In this example:
+- `jei` uses specific file ID 4593548
+- `geckolib` uses version matching "4.2.4" in the filename
+- `aquaculture` auto-selects the newest compatible version
+
+## Using Listing Files
+
+For better organization, use a listing file with one project-file reference per line.
+
+<Steps>
+
+<Step title="Create a listing file">
+
+Create `cf-mods.txt`:
+
+```text
+# Core mods
+jei:10.2.1.1005
+geckolib
+aquaculture
+
+# Additional mods
+naturalist
+```
+
+Blank lines and lines starting with `#` are ignored.
+
+</Step>
+
+<Step title="Mount the file">
+
+```yaml
+volumes:
+  - ./cf-mods.txt:/extras/cf-mods.txt:ro
+```
+
+</Step>
+
+<Step title="Reference it in CURSEFORGE_FILES">
+
+```yaml
+environment:
+  CURSEFORGE_FILES: "@/extras/cf-mods.txt"
+```
+
+</Step>
+
+</Steps>
+
+## Multi-Line in Docker Compose
+
+Use [YAML multi-line strings](https://yaml-multiline.info/) to organize your mods cleanly:
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      CF_API_KEY: ${CF_API_KEY}
+      TYPE: FORGE
+      VERSION: "1.20.1"
+      CURSEFORGE_FILES: |
+        jei
+        geckolib
+        aquaculture
+        naturalist
+        biomes-o-plenty
+```
+
+## Dependencies
+
+The files processing can detect if a dependency is missing from your list and will warn you.
+
+<Warning>
+CurseForge dependencies cannot be automatically resolved because the metadata only provides the mod ID, not the specific file version/ID needed. You must manually add required dependencies to your `CURSEFORGE_FILES` list.
+</Warning>
+
+## Complete Example
+
+<Steps>
+
+<Step title="Get a CurseForge API key">
+
+Obtain an API key from [CurseForge's developer console](https://console.curseforge.com/).
+
+Store it in a `.env` file:
+
+```bash
+CF_API_KEY=your-api-key-here
+```
+
+</Step>
+
+<Step title="Create docker-compose.yml">
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      CF_API_KEY: ${CF_API_KEY}
+      TYPE: FORGE
+      VERSION: "1.20.1"
+      CURSEFORGE_FILES: |
+        https://www.curseforge.com/minecraft/mc-mods/jei
+        geckolib@4.2.4
+        aquaculture
+        238222:4593548
+    volumes:
+      - minecraft-data:/data
+    ports:
+      - "25565:25565"
+
+volumes:
+  minecraft-data:
+```
+
+This configuration:
+- Downloads JEI (latest compatible version)
+- Downloads Geckolib version matching "4.2.4"
+- Downloads Aquaculture (latest compatible version)
+- Downloads project 238222, file 4593548
+
+</Step>
+
+<Step title="Start the server">
+
+```bash
+docker compose up -d
+```
+
+Monitor the logs to see mod downloads:
+
+```bash
+docker compose logs -f
+```
+
+</Step>
+
+<Step title="Update mods">
+
+To update mods to their latest versions, remove version specifiers and restart:
+
+```yaml
+CURSEFORGE_FILES: |
+  jei
+  geckolib  # Changed from geckolib@4.2.4
+  aquaculture
+```
+
+```bash
+docker compose up -d
+```
+
+</Step>
+
+</Steps>
+
+## Auto-Removal
+
+Mods are automatically removed when you remove them from `CURSEFORGE_FILES`.
+
+**Example:**
+
+Original configuration:
+```yaml
+CURSEFORGE_FILES: |
+  jei
+  geckolib
+  aquaculture
+```
+
+Updated configuration (removed geckolib):
+```yaml
+CURSEFORGE_FILES: |
+  jei
+  aquaculture
+```
+
+After restart, the geckolib mod will be automatically removed from the `mods` directory.
+
+<Note>
+Setting `CURSEFORGE_FILES` to an empty string removes all previously managed project-files:
+
+```yaml
+CURSEFORGE_FILES: ""
+```
+</Note>
+
+## Finding Project Information
+
+### Project Slug
+
+The project slug is in the URL:
+```
+https://www.curseforge.com/minecraft/mc-mods/jei
+                                              ^^^-- slug
+```
+
+### Project ID
+
+Find the project ID on the right sidebar of the project page under "About Project".
+
+### File ID
+
+Find the file ID in the URL when viewing a specific file:
+```
+https://www.curseforge.com/minecraft/mc-mods/jei/files/4593548
+                                                       ^^^^^^^-- file ID
+```
+
+Or find it in the "About" section when viewing a file.
+
+## Environment Variables Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `CURSEFORGE_FILES` | Comma/space/newline separated list of project-file references | Yes |
+| `CF_API_KEY` | CurseForge API key | Yes |
+| `CF_API_KEY_FILE` | Path to file containing CurseForge API key | Alternative to CF_API_KEY |
+
+<Note>
+Use `CF_API_KEY_FILE` instead of `CF_API_KEY` for better security with Docker secrets or mounted key files.
+</Note>

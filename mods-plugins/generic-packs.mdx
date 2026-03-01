@@ -1,0 +1,185 @@
+---
+title: Generic Pack Files
+description: Install server content from zip or tgz archives
+---
+
+Generic packs allow you to install all server content (jars, mods, plugins, configs, etc.) from a zip or tgz archive file. This is useful for applying CurseForge modpacks that are missing a server start script and/or Forge installer.
+
+## Single Generic Pack
+
+To install content from a single archive file, set `GENERIC_PACK` to the container path or URL of the archive.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  GENERIC_PACK: https://example.com/modpack.zip
+```
+
+```bash Docker Run
+-e GENERIC_PACK=https://example.com/modpack.zip
+```
+</CodeGroup>
+
+## Multiple Generic Packs
+
+To apply multiple generic packs together, use `GENERIC_PACKS` with a comma-separated list of archive file paths and/or URLs.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  GENERIC_PACKS: |
+    https://cdn.example.org/configs.zip
+    https://cdn.example.org/mods.zip
+```
+
+```bash Docker Run
+-e GENERIC_PACKS="https://cdn.example.org/configs.zip,https://cdn.example.org/mods.zip"
+```
+</CodeGroup>
+
+### Using Prefix and Suffix
+
+To avoid repetition, each entry will be prefixed by `GENERIC_PACKS_PREFIX` and suffixed by `GENERIC_PACKS_SUFFIX`.
+
+**Example:**
+
+```yaml
+environment:
+  GENERIC_PACKS: |
+    configs-v9.0.1
+    mods-v4.3.6
+  GENERIC_PACKS_PREFIX: https://cdn.example.org/
+  GENERIC_PACKS_SUFFIX: .zip
+```
+
+This expands to:
+- `https://cdn.example.org/configs-v9.0.1.zip`
+- `https://cdn.example.org/mods-v4.3.6.zip`
+
+## Performance Options
+
+### Skip Update Check
+
+For large generic packs, updates can be time-consuming. Skip the update check by setting:
+
+```yaml
+SKIP_GENERIC_PACK_UPDATE_CHECK: "true"
+```
+
+### Force Update
+
+Force the generic pack(s) to be re-applied:
+
+```yaml
+FORCE_GENERIC_PACK_UPDATE: "true"
+```
+
+### Skip Checksum
+
+The most time-consuming portion of updates is SHA1 checksum generation. Skip it with:
+
+```yaml
+SKIP_GENERIC_PACK_CHECKSUM: "true"
+```
+
+<Warning>
+Skipping checksum validation means the container won't detect if pack contents have changed.
+</Warning>
+
+## Disabling Specific Mods
+
+To disable specific mods (useful for conflicts between multiple generic packs), use `GENERIC_PACKS_DISABLE_MODS`.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  GENERIC_PACKS_DISABLE_MODS: |
+    mod1.jar
+    mod2.jar
+    conflicting-mod.jar
+```
+
+```bash Docker Run
+-e GENERIC_PACKS_DISABLE_MODS="mod1.jar mod2.jar conflicting-mod.jar"
+```
+</CodeGroup>
+
+## Complete Example
+
+<Steps>
+
+<Step title="Create docker-compose.yml">
+
+Set up a server with multiple generic packs:
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FORGE
+      VERSION: "1.20.1"
+      GENERIC_PACKS: |
+        base-pack-v2.1.0
+        performance-mods-v1.3.2
+        custom-configs-v3.0.5
+      GENERIC_PACKS_PREFIX: https://cdn.myserver.com/packs/
+      GENERIC_PACKS_SUFFIX: .zip
+      GENERIC_PACKS_DISABLE_MODS: |
+        duplicate-mod.jar
+        problematic-mod.jar
+      SKIP_GENERIC_PACK_CHECKSUM: "false"
+    volumes:
+      - minecraft-data:/data
+    ports:
+      - "25565:25565"
+
+volumes:
+  minecraft-data:
+```
+
+</Step>
+
+<Step title="Start the server">
+
+```bash
+docker compose up -d
+```
+
+The container will:
+1. Download all three pack files
+2. Extract them to `/data`
+3. Disable the specified mods
+4. Start the server
+
+</Step>
+
+<Step title="Monitor logs">
+
+```bash
+docker compose logs -f
+```
+
+Watch for successful pack application and server startup.
+
+</Step>
+
+</Steps>
+
+## Environment Variables Reference
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `GENERIC_PACK` | Single archive file URL or path | None |
+| `GENERIC_PACKS` | Comma/newline separated list of archives | None |
+| `GENERIC_PACKS_PREFIX` | Prefix added to each pack entry | None |
+| `GENERIC_PACKS_SUFFIX` | Suffix added to each pack entry | None |
+| `SKIP_GENERIC_PACK_UPDATE_CHECK` | Skip update checking for performance | `false` |
+| `FORCE_GENERIC_PACK_UPDATE` | Force re-application of packs | `false` |
+| `SKIP_GENERIC_PACK_CHECKSUM` | Skip SHA1 checksum generation | `false` |
+| `GENERIC_PACKS_DISABLE_MODS` | Space/newline separated mod filenames to disable | None |
+
+<Note>
+Generic packs are applied before other mod installation methods, allowing you to layer additional mods on top.
+</Note>

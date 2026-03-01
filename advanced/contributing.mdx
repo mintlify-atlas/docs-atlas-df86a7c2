@@ -1,0 +1,278 @@
+---
+title: Contributing Guide
+description: Learn how to contribute to the Docker Minecraft Server project
+---
+
+Contributions to the Docker Minecraft Server project are welcome! This guide explains how to develop, test, and contribute improvements.
+
+## Ways to Contribute
+
+- Add new server type support
+- Fix bugs and issues
+- Improve documentation
+- Add new features
+- Report issues and suggestions
+
+## Adding a Server Type
+
+Adding support for a new server `TYPE` varies in complexity depending on how the server is obtained and configured.
+
+<Steps>
+  <Step title="Copy an existing deploy script">
+    Copy an existing `start-deploy*` script, such as [start-deployFabric](https://github.com/itzg/docker-minecraft-server/blob/master/scripts/start-deployFabric), and rename it with the "start-deploy" prefix.
+    
+    ```bash
+    cp scripts/start-deployFabric scripts/start-deployYourType
+    ```
+  </Step>
+  
+  <Step title="Modify type-specific behavior">
+    Edit your new script to implement the type-specific logic between:
+    - The "start-utils" preamble at the beginning
+    - The hand-off to `start-setupWorld` at the end
+    
+    Keep the overall structure but customize the download and configuration logic for your server type.
+  </Step>
+  
+  <Step title="Test your changes">
+    Use the iterative development process (described below) to develop and test your changes.
+  </Step>
+  
+  <Step title="Register in start-configuration">
+    Add a case entry to the `case "${TYPE^^}"` statement in [start-configuration](https://github.com/itzg/docker-minecraft-server/blob/master/scripts/start-configuration):
+    
+    ```bash
+    YOURTYPE)
+      exec "${SCRIPTS:-/}start-deployYourType" "$@"
+      ;;
+    ```
+  </Step>
+  
+  <Step title="Add documentation">
+    Add a documentation section in the [docs directory](https://github.com/itzg/docker-minecraft-server/tree/master/docs). Copy and modify an existing section to maintain consistent style and detail level.
+  </Step>
+  
+  <Step title="Submit a pull request">
+    [Submit your pull request](https://github.com/itzg/docker-minecraft-server/pulls) with:
+    - Clear description of the new server type
+    - Testing notes
+    - Documentation updates
+  </Step>
+</Steps>
+
+## Iterative Script Development
+
+The `compose-dev.yml` file enables rapid development by mounting local scripts into the container.
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/itzg/docker-minecraft-server.git
+cd docker-minecraft-server
+```
+
+### Development Workflow
+
+```bash
+# Run with development mounts
+docker compose -f compose-dev.yml run --rm -it mc-dev
+
+# With environment variables for testing
+docker compose -f compose-dev.yml run --rm -it \
+  -e TYPE=PAPER \
+  -e VERSION=1.20.4 \
+  mc-dev
+```
+
+<Note>
+To speed up the development cycle, set `SETUP_ONLY=true` to skip starting the actual Minecraft server:
+
+```bash
+docker compose -f compose-dev.yml run --rm -it \
+  -e SETUP_ONLY=true \
+  -e TYPE=YOURTYPE \
+  mc-dev
+```
+</Note>
+
+This allows you to:
+1. Edit scripts locally in your editor
+2. Run the container to test changes
+3. See results immediately without rebuilding
+4. Iterate quickly
+
+## Using Development Copy of Tools
+
+You can test local versions of supporting tools like `mc-image-helper`.
+
+### Java-based Tools (mc-image-helper)
+
+<Steps>
+  <Step title="Clone and build the tool">
+    ```bash
+    git clone https://github.com/itzg/mc-image-helper.git
+    cd mc-image-helper
+    ./gradlew installDist
+    ```
+    
+    The distribution will be installed in `build/install/mc-image-helper`.
+  </Step>
+  
+  <Step title="Get the absolute path">
+    ```bash
+    pwd
+    # Note the output, e.g., /home/user/projects/mc-image-helper
+    ```
+  </Step>
+  
+  <Step title="Mount in container">
+    **Using docker run:**
+    ```bash
+    docker run -it --rm \
+      -v /path/to/mc-image-helper/build/install/mc-image-helper:/usr/share/mc-image-helper \
+      -e EULA=true \
+      itzg/minecraft-server
+    ```
+    
+    **Using docker-compose.yml:**
+    ```yaml
+    services:
+      mc:
+        image: itzg/minecraft-server
+        volumes:
+          - /path/to/mc-image-helper/build/install/mc-image-helper:/usr/share/mc-image-helper:ro
+          - ./data:/data
+    ```
+  </Step>
+</Steps>
+
+### Go-based Tools
+
+<Steps>
+  <Step title="Build snapshot release">
+    ```bash
+    cd /path/to/tool-repo
+    goreleaser release --snapshot --clean
+    ```
+  </Step>
+  
+  <Step title="Setup github-releases-proxy">
+    Clone and run [itzg/github-releases-proxy](https://github.com/itzg/github-releases-proxy) according to its instructions.
+  </Step>
+  
+  <Step title="Build Docker image with proxy">
+    ```bash
+    docker build \
+      --build-arg GITHUB_BASEURL=http://host.docker.internal:8080 \
+      --build-arg APPS_REV=1 \
+      --build-arg MC_HELPER_VERSION=1.8.1-SNAPSHOT \
+      -t itzg/minecraft-server .
+    ```
+  </Step>
+</Steps>
+
+## Contributing to Documentation
+
+The documentation is written in Markdown and built using [Zensical](https://zensical.org/).
+
+### Documentation Structure
+
+- Source files: [`docs/`](https://github.com/itzg/docker-minecraft-server/tree/master/docs) directory
+- Organized into sections by directory
+- Written in Markdown with Zensical extensions
+
+<Note>
+The `README.md` rarely needs modification - it only serves as a brief project introduction. Most updates should go in the `docs/` directory.
+</Note>
+
+### Local Documentation Development
+
+<Steps>
+  <Step title="Start the documentation server">
+    ```bash
+    docker compose -f compose-docs.yml -p zensical up
+    ```
+  </Step>
+  
+  <Step title="View live documentation">
+    Open [http://localhost:8000](http://localhost:8000) in your browser.
+  </Step>
+  
+  <Step title="Edit and see changes">
+    Edit files in the `docs/` directory. Changes will be reflected automatically in your browser.
+  </Step>
+</Steps>
+
+### Documentation Guidelines
+
+- **Follow existing patterns**: Look at similar pages for style and structure
+- **Be concise but complete**: Provide enough detail for users to succeed
+- **Include examples**: Show both docker run and docker-compose.yml examples
+- **Use proper formatting**: Follow [Zensical markdown conventions](https://zensical.org/docs/authoring/markdown/)
+- **Test locally**: Always preview changes before submitting
+
+## Generating Release Notes
+
+When preparing a release, use this git command to generate release notes:
+
+```bash
+git log --invert-grep \
+  --grep "^ci:" \
+  --grep "^misc:" \
+  --grep "^docs:" \
+  --pretty="* %s" \
+  1.1.0..1.2.0
+```
+
+Replace version tags as appropriate. This filters out CI, miscellaneous, and documentation commits to focus on user-facing changes.
+
+## Pull Request Guidelines
+
+When submitting a pull request:
+
+<Steps>
+  <Step title="Create a focused PR">
+    - Address one feature or fix per PR
+    - Keep changes focused and atomic
+    - Avoid mixing unrelated changes
+  </Step>
+  
+  <Step title="Write a clear description">
+    Explain:
+    - What the PR does
+    - Why the change is needed
+    - How you tested it
+    - Any breaking changes or special considerations
+  </Step>
+  
+  <Step title="Include tests and documentation">
+    - Test your changes thoroughly
+    - Update or add documentation
+    - Include example configurations if applicable
+  </Step>
+  
+  <Step title="Follow conventions">
+    - Match existing code style
+    - Use consistent naming
+    - Follow shell script best practices
+    - Add comments for complex logic
+  </Step>
+</Steps>
+
+## Getting Help
+
+If you need help contributing:
+
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/itzg/docker-minecraft-server/discussions)
+- **Issues**: Check existing [issues](https://github.com/itzg/docker-minecraft-server/issues) for similar problems
+- **Code examples**: Look at existing server type implementations
+- **Community**: Join the community for support and collaboration
+
+## Code of Conduct
+
+Be respectful and constructive in all interactions. We're all here to make Minecraft server hosting better for everyone.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0, the same license as the project.

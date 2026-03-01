@@ -1,0 +1,721 @@
+---
+title: Kubernetes Deployment
+description: Deploy Minecraft servers on Kubernetes with StatefulSets, Helm charts, and persistent storage
+---
+
+Kubernetes provides robust orchestration capabilities for running Minecraft servers in production environments with high availability, auto-scaling, and resource management.
+
+## Deployment Methods
+
+<CardGroup cols={2}>
+  <Card title="Helm Charts" icon="helm" href="#using-helm">
+    Simplified deployment using community Helm charts
+  </Card>
+  
+  <Card title="StatefulSets" icon="database" href="#using-statefulsets">
+    Direct deployment with Kubernetes manifests
+  </Card>
+  
+  <Card title="Operators" icon="gears" href="#using-operators">
+    Automated management with Shulker operator
+  </Card>
+  
+  <Card title="Simple Deployment" icon="rocket" href="#simple-deployment">
+    Basic Deployment with emptyDir storage
+  </Card>
+</CardGroup>
+
+## Using Helm
+
+### itzg Helm Chart
+
+The official Helm chart provides the easiest deployment method:
+
+<Steps>
+  <Step title="Add the Helm repository">
+    ```bash
+    helm repo add itzg https://itzg.github.io/minecraft-server-charts/
+    helm repo update
+    ```
+  </Step>
+  
+  <Step title="Install the chart">
+    ```bash
+    helm install my-minecraft itzg/minecraft \
+      --set minecraftServer.eula=true \
+      --set persistence.dataDir.enabled=true
+    ```
+  </Step>
+  
+  <Step title="Verify deployment">
+    ```bash
+    kubectl get pods
+    kubectl get svc
+    ```
+  </Step>
+</Steps>
+
+### Custom Values
+
+Create a `values.yaml` file for customization:
+
+```yaml values.yaml
+minecraftServer:
+  eula: true
+  version: "1.21.4"
+  type: PAPER
+  difficulty: normal
+  maxPlayers: 50
+  viewDistance: 10
+  memory: 4096M
+  serviceType: LoadBalancer
+  
+persistence:
+  dataDir:
+    enabled: true
+    size: 10Gi
+    storageClass: "standard"
+
+resources:
+  requests:
+    memory: 4Gi
+    cpu: 2000m
+  limits:
+    memory: 6Gi
+    cpu: 4000m
+```
+
+Then install with:
+
+```bash
+helm install my-minecraft itzg/minecraft -f values.yaml
+```
+
+<Note>
+  View the full chart documentation at [itzg/minecraft-server-charts](https://github.com/itzg/minecraft-server-charts)
+</Note>
+
+### mcsh/server-deployment
+
+Alternative Helm chart with additional features:
+
+```bash
+helm repo add mcsh https://mcserverhosting-net.github.io/charts/
+helm install minecraft mcsh/minecraft
+```
+
+## Using StatefulSets
+
+StatefulSets are ideal for Minecraft servers as they provide:
+
+- Stable network identities
+- Persistent storage
+- Ordered deployment and scaling
+- Stable persistent volume claims
+
+### Complete StatefulSet Example
+
+<CodeGroup>
+```yaml statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: mc-example
+  name: mc-example
+spec:
+  replicas: 1
+  serviceName: mc-example
+  selector:
+    matchLabels:
+      app: mc-example
+  template:
+    metadata:
+      labels:
+        app: mc-example
+    spec:
+      containers:
+        - name: mc
+          image: itzg/minecraft-server
+          imagePullPolicy: Always
+          env:
+            - name: EULA
+              value: "TRUE"
+            - name: TYPE
+              value: PAPER
+            - name: VERSION
+              value: "1.21.4"
+            - name: MEMORY
+              value: "4G"
+          ports:
+            - containerPort: 25565
+              name: minecraft
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /data
+              name: data
+          readinessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --host
+                - localhost
+                - --port
+                - "25565"
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --host
+                - localhost
+            initialDelaySeconds: 120
+            periodSeconds: 60
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2000m"
+            limits:
+              memory: "6Gi"
+              cpu: "4000m"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: standard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    service: mc-example
+  name: mc-example
+spec:
+  ports:
+    - port: 25565
+      targetPort: 25565
+      protocol: TCP
+  selector:
+    app: mc-example
+  type: LoadBalancer
+```
+
+```yaml service-nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mc-example-nodeport
+spec:
+  type: NodePort
+  ports:
+    - port: 25565
+      targetPort: 25565
+      nodePort: 30000
+  selector:
+    app: mc-example
+```
+</CodeGroup>
+
+<Steps>
+  <Step title="Apply the manifest">
+    ```bash
+    kubectl apply -f statefulset.yaml
+    ```
+  </Step>
+  
+  <Step title="Check status">
+    ```bash
+    kubectl get statefulset mc-example
+    kubectl get pods -l app=mc-example
+    kubectl get pvc
+    ```
+  </Step>
+  
+  <Step title="View logs">
+    ```bash
+    kubectl logs -f mc-example-0
+    ```
+  </Step>
+  
+  <Step title="Get service endpoint">
+    ```bash
+    kubectl get svc mc-example
+    ```
+  </Step>
+</Steps>
+
+### Key Configuration Elements
+
+<AccordionGroup>
+  <Accordion title="Health Probes">
+    **Readiness Probe** - Determines when the pod is ready to accept traffic:
+    ```yaml
+    readinessProbe:
+      exec:
+        command:
+          - mc-monitor
+          - status
+          - --host
+          - localhost
+          - --port
+          - "25565"
+      initialDelaySeconds: 30
+      periodSeconds: 5
+      failureThreshold: 18
+    ```
+    
+    This gives the server up to 120 seconds to start (30 + 5 × 18).
+    
+    **Liveness Probe** - Detects if the server has become unresponsive:
+    ```yaml
+    livenessProbe:
+      exec:
+        command:
+          - mc-monitor
+          - status
+          - --host
+          - localhost
+      initialDelaySeconds: 120
+      periodSeconds: 60
+    ```
+    
+    <Warning>
+      Set `initialDelaySeconds` high enough for server startup to avoid premature restarts.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Resource Management">
+    Define CPU and memory resources:
+    ```yaml
+    resources:
+      requests:
+        memory: "4Gi"    # Guaranteed allocation
+        cpu: "2000m"     # 2 cores
+      limits:
+        memory: "6Gi"    # Maximum allowed
+        cpu: "4000m"     # 4 cores max
+    ```
+    
+    **Guidelines:**
+    - Requests: What the pod needs to run
+    - Limits: Maximum the pod can use
+    - Set memory limits ~1.5x higher than JVM heap
+    - CPU limits prevent resource starvation
+  </Accordion>
+
+  <Accordion title="Persistent Storage">
+    Volume claim templates create persistent storage:
+    ```yaml
+    volumeClaimTemplates:
+      - metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+          storageClassName: standard
+    ```
+    
+    **Storage classes** vary by provider:
+    - GKE: `standard`, `standard-rwo`
+    - EKS: `gp2`, `gp3`
+    - AKS: `default`, `managed-premium`
+    
+    <Note>
+      PVCs created by StatefulSets are not deleted when the StatefulSet is deleted.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Service Types">
+    **LoadBalancer** (recommended for cloud providers):
+    ```yaml
+    spec:
+      type: LoadBalancer
+      ports:
+        - port: 25565
+          targetPort: 25565
+    ```
+    
+    **NodePort** (for on-premises or manual load balancing):
+    ```yaml
+    spec:
+      type: NodePort
+      ports:
+        - port: 25565
+          nodePort: 30000
+    ```
+    
+    **ClusterIP with Ingress** (for TCP proxy):
+    ```yaml
+    spec:
+      type: ClusterIP
+      ports:
+        - port: 25565
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Simple Deployment
+
+For testing or development, use a basic Deployment:
+
+```yaml deployment.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mc-vanilla
+spec:
+  type: NodePort
+  ports:
+  - port: 25565
+    nodePort: 30000
+  selector:
+    app: mc-vanilla
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mc-vanilla
+spec:
+  selector:
+    matchLabels:
+      app: mc-vanilla
+  template:
+    metadata:
+      labels:
+        app: mc-vanilla
+    spec:
+      containers:
+      - image: itzg/minecraft-server
+        name: mc-vanilla
+        env:
+        - name: EULA
+          value: "true"
+        ports:
+        - containerPort: 25565
+          name: main
+        readinessProbe:
+          exec:
+            command: ["/usr/local/bin/mc-monitor", "status", "--host", "localhost"]
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          failureThreshold: 20
+        livenessProbe:
+          exec:
+            command: ["/usr/local/bin/mc-monitor", "status", "--host", "localhost"]
+          initialDelaySeconds: 120
+          periodSeconds: 60
+        volumeMounts:
+        - name: mc-data
+          mountPath: /data
+      volumes:
+      - name: mc-data
+        emptyDir: {}
+```
+
+<Warning>
+  This uses `emptyDir` which loses data when the pod is deleted. Only use for testing!
+</Warning>
+
+## Using Operators
+
+### Shulker Operator
+
+[Shulker](https://github.com/jeremylvln/Shulker) is a Kubernetes operator for managing complex Minecraft infrastructures:
+
+<Steps>
+  <Step title="Install the operator">
+    ```bash
+    kubectl apply -f https://github.com/jeremylvln/Shulker/releases/latest/download/shulker.yaml
+    ```
+  </Step>
+  
+  <Step title="Create a server">
+    ```yaml minecraft-server.yaml
+    apiVersion: shulker.io/v1alpha1
+    kind: MinecraftServer
+    metadata:
+      name: my-server
+    spec:
+      version: "1.21.4"
+      type: PAPER
+      replicas: 1
+      memory: "4Gi"
+      storage:
+        size: 10Gi
+    ```
+  </Step>
+  
+  <Step title="Apply the configuration">
+    ```bash
+    kubectl apply -f minecraft-server.yaml
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Shulker uses `itzg/minecraft-server` under the hood and provides CRDs for easier management.
+</Note>
+
+## Configuration Management
+
+### Using ConfigMaps
+
+Store server.properties in a ConfigMap:
+
+```yaml configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mc-server-properties
+data:
+  server.properties: |
+    motd=My Kubernetes Server
+    max-players=50
+    view-distance=10
+    difficulty=normal
+---
+apiVersion: apps/v1
+kind: StatefulSet
+spec:
+  template:
+    spec:
+      containers:
+      - name: mc
+        volumeMounts:
+        - name: config
+          mountPath: /data/server.properties
+          subPath: server.properties
+      volumes:
+      - name: config
+        configMap:
+          name: mc-server-properties
+```
+
+### Using Secrets
+
+Store sensitive data like RCON passwords:
+
+```bash
+kubectl create secret generic mc-rcon \
+  --from-literal=password='your-secure-password'
+```
+
+```yaml
+env:
+  - name: RCON_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mc-rcon
+        key: password
+```
+
+## Scaling Considerations
+
+<Warning>
+  Minecraft servers are stateful and cannot be horizontally scaled. Keep replicas at 1.
+</Warning>
+
+### Vertical Scaling
+
+Increase resources for a single server:
+
+```bash
+kubectl patch statefulset mc-example -p '{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "mc",
+          "resources": {
+            "requests": {"memory": "8Gi", "cpu": "4000m"},
+            "limits": {"memory": "12Gi", "cpu": "6000m"}
+          }
+        }]
+      }
+    }
+  }
+}'
+```
+
+### Multiple Servers
+
+Deploy separate StatefulSets for multiple servers:
+
+```bash
+# Survival server
+helm install survival itzg/minecraft -f survival-values.yaml
+
+# Creative server
+helm install creative itzg/minecraft -f creative-values.yaml
+```
+
+## Monitoring and Debugging
+
+### View Logs
+
+```bash
+# Follow logs
+kubectl logs -f mc-example-0
+
+# Last 100 lines
+kubectl logs --tail=100 mc-example-0
+
+# Previous instance
+kubectl logs --previous mc-example-0
+```
+
+### Execute Commands
+
+```bash
+# Attach to console
+kubectl attach mc-example-0 -it
+
+# Execute RCON command
+kubectl exec mc-example-0 -- rcon-cli list
+
+# Access shell
+kubectl exec -it mc-example-0 -- /bin/bash
+```
+
+### Check Status
+
+```bash
+# Pod status
+kubectl describe pod mc-example-0
+
+# Server status
+kubectl exec mc-example-0 -- mc-monitor status
+
+# Resource usage
+kubectl top pod mc-example-0
+```
+
+## Backup and Restore
+
+### Manual Backup
+
+```bash
+# Create backup
+kubectl exec mc-example-0 -- tar czf /tmp/backup.tar.gz /data
+kubectl cp mc-example-0:/tmp/backup.tar.gz ./backup.tar.gz
+```
+
+### Automated Backups
+
+Use a CronJob for regular backups:
+
+```yaml backup-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mc-backup
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: itzg/mc-backup
+            env:
+            - name: BACKUP_INTERVAL
+              value: "24h"
+            volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+            - name: backups
+              mountPath: /backups
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: data-mc-example-0
+          - name: backups
+            persistentVolumeClaim:
+              claimName: mc-backups
+          restartPolicy: OnFailure
+```
+
+## Cloud Provider Examples
+
+### Google Kubernetes Engine (GKE)
+
+```yaml gke-values.yaml
+persistence:
+  dataDir:
+    storageClass: "standard-rwo"
+    size: 20Gi
+
+resources:
+  requests:
+    memory: 4Gi
+    cpu: 2
+  limits:
+    memory: 6Gi
+    cpu: 4
+
+minecraftServer:
+  serviceType: LoadBalancer
+  serviceAnnotations:
+    cloud.google.com/load-balancer-type: "Internal"
+```
+
+### Amazon EKS
+
+```yaml eks-values.yaml
+persistence:
+  dataDir:
+    storageClass: "gp3"
+    size: 20Gi
+
+minecraftServer:
+  serviceType: LoadBalancer
+  serviceAnnotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+```
+
+### Azure AKS
+
+```yaml aks-values.yaml
+persistence:
+  dataDir:
+    storageClass: "managed-premium"
+    size: 20Gi
+
+minecraftServer:
+  serviceType: LoadBalancer
+  serviceAnnotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Swarm" icon="layer-group" href="/deployment/docker-swarm">
+    Deploy on Docker Swarm clusters
+  </Card>
+  
+  <Card title="More Examples" icon="code" href="/deployment/examples">
+    Explore additional deployment patterns
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [itzg Helm Charts Repository](https://github.com/itzg/minecraft-server-charts)
+- [Shulker Operator](https://github.com/jeremylvln/Shulker)
+- [Kubernetes Examples](https://github.com/itzg/docker-minecraft-server/tree/master/examples/k8s)
+- [mcsh/server-deployment](https://github.com/mcserverhosting-net/charts)

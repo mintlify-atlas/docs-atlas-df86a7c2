@@ -1,0 +1,285 @@
+---
+title: Modrinth Mods & Plugins
+description: Auto-download mods, plugins, and datapacks from Modrinth
+---
+
+[Modrinth](https://modrinth.com/) is an open source modding platform with a clean, easy to use website for finding [mods](https://modrinth.com/mods), [plugins](https://modrinth.com/plugins), and [datapacks](https://modrinth.com/datapacks). 
+
+At startup, the container automatically locates and downloads the newest versions of files that correspond to your server's `TYPE` and `VERSION`. Older file versions are automatically cleaned up.
+
+## Basic Usage
+
+Set `MODRINTH_PROJECTS` to a comma or newline separated list of projects.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  TYPE: FABRIC
+  VERSION: "1.21.4"
+  MODRINTH_PROJECTS: |
+    fabric-api
+    lithium
+    ferritecore
+```
+
+```bash Docker Run
+-e TYPE=FABRIC \
+-e VERSION="1.21.4" \
+-e MODRINTH_PROJECTS="fabric-api,lithium,ferritecore"
+```
+</CodeGroup>
+
+## Project Entry Formats
+
+Each project entry can use one of these formats (where `:` separates parts):
+
+```
+         Project
+         Project : Version
+         Project : Release Type
+Prefix : Project
+Prefix : Project : Version
+Prefix : Project : Release Type
+@ Listing File
+```
+
+### Components
+
+**Project** - The project slug or ID
+- Slug: The part of the URL after `/mod/`, `/plugin/`, or `/datapack/`
+- ID: Copy from the project page menu
+
+![Modrinth project slug](../img/modrinth-plugin-project-slug.png)
+
+**Version** - Version ID (like "Oa9ZDzZq") or number (like "2.21.2")
+- When omitted, the latest release version is selected
+- Using version ID overrides Minecraft and loader compatibility checks
+- Find on version-specific pages like `https://modrinth.com/plugin/essentialsx/version/2.21.2`
+
+**Release Type** - `release`, `beta`, or `alpha`
+- Selects the latest version of that type
+
+**Prefix** - `datapack`, `fabric`, `forge`, or `paper`
+- `datapack` is optional when running a vanilla server
+- `fabric`, `forge`, and `paper` allow installing mods/plugins that differ from server's `TYPE`
+- Example: Use `fabric:` prefix to load Fabric mods into a NeoForge server via [Sinytra Connector](https://modrinth.com/mod/connector)
+
+**Listing File** - Container path to a file containing project list
+- Must start with `@`
+
+## Examples
+
+| Description | Example |
+|-------------|----------|
+| Select latest version | `fabric-api` |
+| Select specific version by ID | `fabric-api:bQZpGIz0` |
+| Select specific version by number | `fabric-api:0.119.2+1.21.4` |
+| Select latest beta version | `fabric-api:beta` |
+| Latest version using project ID | `P7dR8mSH` |
+| Latest version of datapack | `datapack:terralith` |
+| Specific version of datapack | `datapack:terralith:2.5.5` |
+| Mod loader override | `fabric:fabric-api` |
+| Fabric mod with specific version | `fabric:fabric-api:bQZpGIz0` |
+| Projects listing file | `@/path/to/modrinth-mods.txt` |
+
+## Using Listing Files
+
+Create a text file with one project per line. Blank lines and comments (starting with `#`) are ignored.
+
+<Steps>
+
+<Step title="Create a listing file">
+
+Create `modrinth-mods.txt`:
+
+```text
+# Performance mods
+fabric-api
+lithium
+ferritecore
+
+# Utility mods
+cloth-config
+
+# Datapacks
+datapack:terralith
+```
+
+</Step>
+
+<Step title="Mount the file in your container">
+
+```yaml
+volumes:
+  - ./modrinth-mods.txt:/extras/modrinth-mods.txt:ro
+```
+
+</Step>
+
+<Step title="Reference it in MODRINTH_PROJECTS">
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: "@/extras/modrinth-mods.txt"
+```
+
+</Step>
+
+</Steps>
+
+## Auto-Removal
+
+Entries removed from `MODRINTH_PROJECTS` will be automatically removed from the `mods` or `plugins` directory.
+
+<Note>
+An empty `MODRINTH_PROJECTS` list will remove all previously installed mods/plugins.
+
+To temporarily disable processing without removing files, comment out the `MODRINTH_PROJECTS` environment variable entirely.
+</Note>
+
+## Version from Projects
+
+Automatically determine the Minecraft `VERSION` based on your projects by setting `VERSION_FROM_MODRINTH_PROJECTS=true`.
+
+The container will select the most recent Minecraft version supported by **all** listed projects.
+
+**Example:**
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    viaversion
+    viabackwards
+    griefprevention
+    discordsrv
+  VERSION_FROM_MODRINTH_PROJECTS: "true"
+```
+
+If all plugins support Minecraft 1.21.8 except `griefprevention` (only supports up to 1.21.7), then `VERSION` will automatically be set to 1.21.7.
+
+## Dependencies
+
+Control whether project dependencies are automatically downloaded:
+
+```yaml
+MODRINTH_DOWNLOAD_DEPENDENCIES: required
+```
+
+| Value | Description |
+|-------|-------------|
+| `none` | Don't download dependencies (default) |
+| `required` | Download required dependencies only |
+| `optional` | Download both required and optional dependencies |
+
+## Advanced Options
+
+### Default Version Type
+
+Set the default version type for all projects:
+
+```yaml
+MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE: beta
+```
+
+| Value | Includes |
+|-------|----------|
+| `release` | Release versions only (default) |
+| `beta` | Release and beta versions |
+| `alpha` | Release, beta, and alpha versions |
+
+### Custom Loader
+
+When using a custom server type, specify which loader type for lookups:
+
+```yaml
+MODRINTH_LOADER: fabric
+```
+
+## Complete Example
+
+<Steps>
+
+<Step title="Create docker-compose.yml">
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.4"
+      MODRINTH_PROJECTS: |
+        fabric-api
+        lithium:beta
+        ferritecore
+        cloth-config:17.0.127
+        datapack:terralith
+      MODRINTH_DOWNLOAD_DEPENDENCIES: required
+      MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE: release
+    volumes:
+      - minecraft-data:/data
+    ports:
+      - "25565:25565"
+
+volumes:
+  minecraft-data:
+```
+
+</Step>
+
+<Step title="Start the server">
+
+```bash
+docker compose up -d
+```
+
+The container will:
+1. Download `fabric-api` (latest release)
+2. Download `lithium` (latest beta)
+3. Download `ferritecore` (latest release)
+4. Download `cloth-config` version 17.0.127
+5. Download `terralith` datapack
+6. Download required dependencies
+7. Start the server
+
+</Step>
+
+<Step title="Update a mod version">
+
+Edit `docker-compose.yml` to update `lithium` to latest release:
+
+```yaml
+MODRINTH_PROJECTS: |
+  fabric-api
+  lithium  # Changed from lithium:beta
+  ferritecore
+  cloth-config:17.0.127
+  datapack:terralith
+```
+
+Restart the container:
+
+```bash
+docker compose up -d
+```
+
+The old beta version is automatically removed and the latest release is downloaded.
+
+</Step>
+
+</Steps>
+
+## Environment Variables Reference
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `MODRINTH_PROJECTS` | Comma/newline separated list of projects | None |
+| `MODRINTH_DOWNLOAD_DEPENDENCIES` | Dependency download mode: `none`, `required`, `optional` | `none` |
+| `MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE` | Default version type: `release`, `beta`, `alpha` | `release` |
+| `MODRINTH_LOADER` | Loader type for custom servers | Auto-detected |
+| `VERSION_FROM_MODRINTH_PROJECTS` | Auto-detect VERSION from projects | `false` |
+
+<Warning>
+Changing `MODRINTH_PROJECTS` and restarting will automatically add new mods and remove old ones. Always backup your data before making changes.
+</Warning>

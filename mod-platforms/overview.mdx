@@ -1,0 +1,80 @@
+---
+title: Mod Platforms Overview
+description: Overview of supported mod platform types for installing modpacks
+---
+
+Mod platform types allow you to automatically install modpacks along with their required mod loaders (Forge, Fabric, Quilt, etc.). The modpack platforms handle downloading declared mods/plugins and applying additional configuration files.
+
+## Selecting a Mod Platform
+
+Mod platforms are selected by setting the `MODPACK_PLATFORM` environment variable. For ease of use and backward compatibility, you can also use `TYPE` or `MOD_PLATFORM`.
+
+```yaml
+environment:
+  MODPACK_PLATFORM: AUTO_CURSEFORGE
+  # or
+  TYPE: MODRINTH
+  # or
+  MOD_PLATFORM: FTBA
+```
+
+## Available Platforms
+
+<CardGroup cols={2}>
+  <Card title="Auto CurseForge" icon="fire" href="/mod-platforms/auto-curseforge">
+    Automated CurseForge modpack installation with upgrade support
+  </Card>
+  <Card title="Modrinth" icon="download" href="/mod-platforms/modrinth">
+    Modrinth modpacks with automatic mod loader installation
+  </Card>
+  <Card title="Feed The Beast" icon="cube" href="/mod-platforms/ftb">
+    FTB Application modpacks with automatic setup
+  </Card>
+  <Card title="GregTech New Horizons" icon="star" href="/mod-platforms/gtnh">
+    Specialized setup for the GTNH modpack
+  </Card>
+</CardGroup>
+
+## Platform Comparison
+
+| Platform | Auto-Update | API Key Required | Version Pinning | Recommended For |
+|----------|-------------|------------------|-----------------|------------------|
+| Auto CurseForge | Yes | Yes | Yes | Most CurseForge modpacks |
+| Modrinth | Yes | No | Yes | Modrinth-hosted modpacks |
+| FTBA | Yes | No | Yes | FTB App modpacks |
+| GTNH | Yes | No | Yes | GT New Horizons specifically |
+
+<Note>
+The `VERSION` environment variable is used to declare the Minecraft version (e.g., `1.19.4`). Each platform has specific variables for qualifying their version in addition to the Minecraft version.
+</Note>
+
+## Common Features
+
+All mod platforms provide:
+
+- Automatic mod loader installation (Forge, Fabric, Quilt)
+- Dependency resolution and downloading
+- Configuration file management
+- Upgrade and downgrade support
+- Cleanup of old files
+
+<Warning>
+World data is never automatically removed during modpack updates. Your saves are always preserved.
+</Warning>
+
+## Java Version Compatibility
+
+Different modpacks require different Java versions. Use the appropriate image tag:
+
+- Java 8: `itzg/minecraft-server:java8`
+- Java 17: `itzg/minecraft-server:java17`
+- Java 21: `itzg/minecraft-server:java21`
+- Java 25: `itzg/minecraft-server:java25`
+
+<Note>
+Most modern modpacks require at least 4GB of memory. Set `MEMORY` to at least `4G` for optimal performance.
+</Note>
+
+## Next Steps
+
+Choose a mod platform from the left navigation to see detailed setup instructions and configuration options.

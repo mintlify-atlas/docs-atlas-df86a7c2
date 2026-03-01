@@ -1,0 +1,341 @@
+---
+title: mc-monitor
+description: Minecraft server monitoring, health checks, and metrics reporting tool
+---
+
+`mc-monitor` is a monitoring tool bundled with the itzg/minecraft-server image that provides health checks, status monitoring, and metrics reporting capabilities for Minecraft servers.
+
+<Note>
+  **Version:** 0.16.1  
+  **Repository:** [itzg/mc-monitor](https://github.com/itzg/mc-monitor)
+</Note>
+
+## Overview
+
+`mc-monitor` can perform server status checks, export metrics for monitoring systems like Prometheus, and provide data for telegraf. It's primarily used for:
+
+- Docker container health checks
+- Prometheus metrics export
+- Telegraf data collection
+- Server status monitoring
+
+## Health Checks
+
+The image uses `mc-monitor` for built-in Docker health checks. You can see the health status in `docker ps`:
+
+```bash
+CONTAINER ID   IMAGE                    STATUS
+b418af073764   itzg/minecraft-server    Up 41 seconds (healthy)
+```
+
+Query health status programmatically:
+
+```bash
+docker container inspect -f "{{.State.Health.Status}}" mc
+# Output: healthy
+```
+
+### Health Check Wrapper
+
+The `mc-health` wrapper script calls `mc-monitor status` with the correct arguments:
+
+```bash
+mc-health
+```
+
+This checks:
+- Server host (default: localhost)
+- Server port (default: 25565)
+- Connection status
+- Server responsiveness
+
+### Customizing Health Checks
+
+In a Docker Compose file:
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    healthcheck:
+      test: mc-health
+      start_period: 1m
+      interval: 5s
+      retries: 20
+```
+
+### Disabling Health Checks
+
+Some orchestration systems don't allow disabling health checks. In those cases:
+
+```yaml
+services:
+  minecraft:
+    environment:
+      DISABLE_HEALTHCHECK: "true"
+```
+
+Or disable via Docker Compose:
+
+```yaml
+services:
+  minecraft:
+    healthcheck:
+      disable: true
+      test: ["NONE"]
+```
+
+<Info>
+  Health checks are automatically disabled for Minecraft versions before Beta 1.8, as those versions don't support server pinging.
+</Info>
+
+## Status Command
+
+### Basic Usage
+
+Check server status:
+
+```bash
+mc-monitor status --host localhost --port 25565
+```
+
+### With Docker
+
+From outside the container:
+
+```bash
+docker exec mc mc-monitor status
+```
+
+### Options
+
+- `--host` - Server hostname or IP (default: localhost)
+- `--port` - Server port (default: 25565)
+- `--timeout` - Connection timeout duration
+- `--retry` - Number of retry attempts
+- `--retry-interval` - Delay between retries
+
+### Examples
+
+```bash
+# Check with custom timeout
+mc-monitor status --host localhost --port 25565 --timeout 10s
+
+# Check with retries
+mc-monitor status --host localhost --port 25565 --retry 3 --retry-interval 5s
+```
+
+## Prometheus Metrics Export
+
+`mc-monitor` can export Prometheus-compatible metrics:
+
+```bash
+mc-monitor export-prometheus --port 9100
+```
+
+### Metrics Provided
+
+- Player count (current/max)
+- Server status (up/down)
+- Server version
+- Response time
+- TPS (ticks per second, when supported)
+
+### Docker Compose Example
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+      - "9100:9100"  # Prometheus metrics
+    command: |
+      bash -c '
+        /start &
+        mc-monitor export-prometheus --port 9100
+      '
+```
+
+### Prometheus Configuration
+
+Add to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'minecraft'
+    static_configs:
+      - targets: ['minecraft-server:9100']
+```
+
+## Telegraf Integration
+
+`mc-monitor` can output data in telegraf-compatible format:
+
+```bash
+mc-monitor export-telegraf
+```
+
+### Telegraf Configuration
+
+```toml
+[[inputs.exec]]
+  commands = ["docker exec mc mc-monitor export-telegraf"]
+  timeout = "5s"
+  data_format = "influx"
+```
+
+## Command Reference
+
+### status
+
+Check if a Minecraft server is running and responsive.
+
+```bash
+mc-monitor status [OPTIONS]
+```
+
+**Options:**
+- `--host <HOST>` - Server hostname (default: localhost)
+- `--port <PORT>` - Server port (default: 25565)
+- `--timeout <DURATION>` - Connection timeout
+- `--retry <COUNT>` - Number of retries
+- `--retry-interval <DURATION>` - Delay between retries
+
+**Exit Codes:**
+- `0` - Server is healthy
+- `1` - Server is not responding or unhealthy
+
+### export-prometheus
+
+Start a Prometheus metrics exporter.
+
+```bash
+mc-monitor export-prometheus [OPTIONS]
+```
+
+**Options:**
+- `--port <PORT>` - Port to expose metrics on (default: 9100)
+- `--host <HOST>` - Minecraft server host to monitor
+- `--mc-port <PORT>` - Minecraft server port
+- `--interval <DURATION>` - Scrape interval
+
+### export-telegraf
+
+Export metrics in telegraf format.
+
+```bash
+mc-monitor export-telegraf [OPTIONS]
+```
+
+**Options:**
+- `--host <HOST>` - Minecraft server host
+- `--port <PORT>` - Minecraft server port
+
+## Environment Variables
+
+The `mc-health` wrapper script respects these environment variables:
+
+- `SERVER_HOST` - Override server host (default: localhost)
+- `SERVER_PORT` - Override server port (default: 25565)
+- `DISABLE_HEALTHCHECK` - Disable health checks entirely
+- `ENABLE_AUTOPAUSE` - Health check considers paused state
+- `MC_HEALTH_EXTRA_ARGS` - Additional arguments for mc-monitor
+
+### Example
+
+```yaml
+environment:
+  SERVER_PORT: "25566"
+  MC_HEALTH_EXTRA_ARGS: "--timeout 30s --retry 3"
+```
+
+## Advanced Usage
+
+### Health Check Configuration File
+
+Create `/data/.mc-health.env` to customize health check behavior:
+
+```bash
+SERVER_HOST=localhost
+SERVER_PORT=25565
+MC_HEALTH_EXTRA_ARGS="--timeout 15s"
+```
+
+### Monitoring Multiple Servers
+
+Monitor multiple servers with different configurations:
+
+```bash
+# Server 1
+mc-monitor status --host server1.example.com --port 25565
+
+# Server 2  
+mc-monitor status --host server2.example.com --port 25566
+```
+
+### Integration with Monitoring Systems
+
+Use `mc-monitor` in monitoring scripts:
+
+```bash
+#!/bin/bash
+
+if mc-monitor status --host localhost --port 25565; then
+  echo "Server is healthy"
+else
+  echo "Server is down! Sending alert..."
+  # Send alert via email, Slack, etc.
+fi
+```
+
+## Compatibility
+
+`mc-monitor` supports:
+
+- Java Edition servers (all versions with server list ping support)
+- Bedrock Edition servers
+- Various server types (Vanilla, Paper, Spigot, Forge, Fabric, etc.)
+- Multiple protocol versions
+
+<Warning>
+  Minecraft versions before Beta 1.8 do not support server pinging and cannot be monitored.
+</Warning>
+
+## Troubleshooting
+
+### Health Check Failing
+
+If health checks are failing:
+
+1. Verify server is fully started (increase `start_period`)
+2. Check server is bound to correct port
+3. Ensure server is not paused (if using Auto-Pause)
+4. Check network connectivity
+
+### Connection Timeout
+
+Increase timeout for slow-starting servers:
+
+```yaml
+healthcheck:
+  test: mc-health
+  start_period: 2m  # Give server more time to start
+  timeout: 30s      # Increase check timeout
+```
+
+### False Negatives with Auto-Pause
+
+When Auto-Pause is enabled, the health check detects suspended Java processes:
+
+```bash
+Java process suspended by Autopause function
+```
+
+This is expected behavior and not a failure.
+
+## Related Commands
+
+See also:
+- [rcon-cli](/api/rcon-cli) - Send commands to server
+- [mc-image-helper](/api/mc-image-helper) - Server setup and configuration

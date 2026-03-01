@@ -1,0 +1,283 @@
+---
+title: Autopause Feature
+description: Automatically pause the Minecraft server process when no players are connected to save resources
+---
+
+The auto-pause feature monitors client connections and pauses the Java process when no players are connected. When a client attempts to connect, the process automatically resumes. This saves CPU resources without affecting the player experience.
+
+<Note>
+  As of Minecraft 1.21.2, the native `pause-when-empty-seconds` server property is recommended instead. Configure it using the `PAUSE_WHEN_EMPTY_SECONDS` environment variable.
+</Note>
+
+## Enabling Auto-Pause
+
+Set the `ENABLE_AUTOPAUSE` environment variable to enable this feature:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      ENABLE_AUTOPAUSE: "true"
+      MAX_TICK_TIME: "-1"  # Required!
+    volumes:
+      - ./data:/data
+```
+
+<Warning>
+  You must disable or greatly increase the `max-tick-time` watchdog. Set `MAX_TICK_TIME=-1` to disable it entirely (highly recommended). From the server's perspective, pausing causes a single tick to take a very long time, which can trigger the watchdog and force a container restart.
+</Warning>
+
+## Watchdog Configuration
+
+### Vanilla Servers
+
+For vanilla Minecraft servers, set `MAX_TICK_TIME` to -1:
+
+```yaml
+environment:
+  ENABLE_AUTOPAUSE: "true"
+  MAX_TICK_TIME: "-1"
+```
+
+### PaperMC Servers
+
+PaperMC has its own watchdog that must be disabled separately:
+
+```yaml
+environment:
+  ENABLE_AUTOPAUSE: "true"
+  MAX_TICK_TIME: "-1"
+  JVM_DD_OPTS: "disable.watchdog:true"
+```
+
+### Other Server Types
+
+Check your server type's documentation for watchdog configuration and disable it accordingly.
+
+## How Auto-Pause Works
+
+<Steps>
+  <Step title="Server starts">
+    The server starts normally and waits for player connections.
+  </Step>
+  
+  <Step title="Timeout period">
+    If no players connect within the configured timeout, the Java process is paused.
+  </Step>
+  
+  <Step title="Player attempts connection">
+    When a player tries to connect, the `knockd` daemon detects the connection attempt at the network interface level.
+  </Step>
+  
+  <Step title="Process resumes">
+    The Java process is automatically resumed, and the player connects normally.
+  </Step>
+</Steps>
+
+## Configuration Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTOPAUSE_TIMEOUT_EST` | `3600` | Seconds between last client disconnect and pausing |
+| `AUTOPAUSE_TIMEOUT_INIT` | `600` | Seconds between server start and pausing (if no connections) |
+| `AUTOPAUSE_TIMEOUT_KN` | `120` | Seconds between port knock and pausing (if no connections) |
+| `AUTOPAUSE_PERIOD` | `10` | Seconds between state machine checks |
+| `AUTOPAUSE_KNOCK_INTERFACE` | `eth0` | Network interface for knock detection |
+| `AUTOPAUSE_STATUS_RETRY_LIMIT` | `10` | Number of status check retries |
+| `AUTOPAUSE_STATUS_RETRY_INTERVAL` | `2s` | Time between status check retries |
+
+### Example Configuration
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOPAUSE: "true"
+      MAX_TICK_TIME: "-1"
+      AUTOPAUSE_TIMEOUT_EST: "1800"    # Pause after 30 min of no players
+      AUTOPAUSE_TIMEOUT_INIT: "300"    # Pause after 5 min if no one joins
+      AUTOPAUSE_TIMEOUT_KN: "60"       # Pause after 1 min of menu pings
+      AUTOPAUSE_PERIOD: "5"            # Check every 5 seconds
+```
+
+## Network Interface Configuration
+
+The knock detection works at the network interface level. The correct interface must be configured for non-default networking:
+
+### Finding the Correct Interface
+
+```bash
+# Run ifconfig inside the container
+docker exec mc ifconfig
+```
+
+Look for the interface receiving incoming connections and set it:
+
+```yaml
+environment:
+  AUTOPAUSE_KNOCK_INTERFACE: "ens0"  # Use your interface name
+```
+
+<Warning>
+  Using the loopback interface (`lo`) will not work for knock detection.
+</Warning>
+
+## Pause State Indicators
+
+### .paused File
+
+When the server is paused, a `.paused` file is created in the `/data` directory:
+
+```bash
+# Check if server is paused
+docker exec mc test -f /data/.paused && echo "Paused" || echo "Running"
+```
+
+Other services can check for this file before attempting to wake the server.
+
+### .skip-pause File
+
+Create a `.skip-pause` file to prevent auto-pausing:
+
+```bash
+# Prevent auto-pause
+docker exec mc touch /data/.skip-pause
+
+# Re-enable auto-pause
+docker exec mc rm /data/.skip-pause
+```
+
+<Note>
+  The auto-pause timer resets when the `.skip-pause` file is present.
+</Note>
+
+## Rootless Auto-Pause
+
+When running rootless containers, additional configuration is required:
+
+### Required Capabilities
+
+Add the `CAP_NET_RAW` capability:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOPAUSE: "true"
+      SKIP_SUDO: "true"
+      MAX_TICK_TIME: "-1"
+    cap_add:
+      - CAP_NET_RAW
+```
+
+### Port Forwarder Configuration
+
+Change from RootlessKit to slirp4netns:
+
+**Docker:**
+
+```bash
+docker run -d \
+  -e ENABLE_AUTOPAUSE=true \
+  -e AUTOPAUSE_KNOCK_INTERFACE=tap0 \
+  --cap-add=CAP_NET_RAW \
+  --network slirp4netns:port_handler=slirp4netns \
+  itzg/minecraft-server
+```
+
+**Podman:**
+
+```bash
+podman run -d \
+  -e ENABLE_AUTOPAUSE=true \
+  -e AUTOPAUSE_KNOCK_INTERFACE=tap0 \
+  --cap-add=CAP_NET_RAW \
+  --network slirp4netns:port_handler=slirp4netns \
+  itzg/minecraft-server
+```
+
+See the setup guides:
+- [Docker rootless networking](https://docs.docker.com/engine/security/rootless/#networking-errors)
+- [RootlessKit port forwarder](https://rootlesscontaine.rs/getting-started/docker/#changing-the-port-forwarder)
+- [Podman port forwarder](https://rootlesscontaine.rs/getting-started/podman/#changing-the-port-forwarder)
+
+## Health Checks with Auto-Pause
+
+When auto-pause is enabled, use the `mc-health` wrapper for health checks:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOPAUSE: "true"
+      MAX_TICK_TIME: "-1"
+    healthcheck:
+      test: mc-health  # Not mc-status!
+      start_period: 2m
+      interval: 10s
+```
+
+<Warning>
+  Do not use `mc-status` directly. The `mc-health` wrapper correctly handles paused server states.
+</Warning>
+
+See the [Health Checking](/operations/healthcheck) page for more details.
+
+## Troubleshooting
+
+### Enable Debug Logging
+
+Add debug output to troubleshoot issues:
+
+```yaml
+environment:
+  ENABLE_AUTOPAUSE: "true"
+  DEBUG_AUTOPAUSE: "true"
+```
+
+### Common Issues
+
+**Server keeps restarting:**
+- Ensure `MAX_TICK_TIME=-1` is set
+- Check for other watchdog configurations in your server type
+
+**Auto-pause not triggering:**
+- Verify the correct network interface is configured
+- Check the timeout values are appropriate
+- Enable debug logging to see state transitions
+
+**Knock detection not working:**
+- Verify `AUTOPAUSE_KNOCK_INTERFACE` matches your network setup
+- Ensure `CAP_NET_RAW` is granted for rootless containers
+- Check that you're not using the loopback interface
+
+## Example Compose File
+
+A complete example is available in the [GitHub repository](https://github.com/itzg/docker-minecraft-server/blob/master/examples/autopause/compose.yml).
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      ENABLE_AUTOPAUSE: "true"
+      MAX_TICK_TIME: "-1"
+      AUTOPAUSE_TIMEOUT_EST: "3600"
+      AUTOPAUSE_TIMEOUT_INIT: "600"
+      AUTOPAUSE_TIMEOUT_KN: "120"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: mc-health
+      start_period: 1m
+      interval: 10s
+    restart: unless-stopped
+```

@@ -1,0 +1,559 @@
+---
+title: Docker Compose setup
+description: Use Docker Compose to manage your Minecraft server with version control and easy configuration
+---
+
+## Why Docker Compose?
+
+Docker Compose makes it easier to manage your Minecraft server by:
+- Storing configuration in a version-controlled file
+- Simplifying updates and reconfiguration
+- Managing multiple services (server, backups, proxies)
+- Enabling easy deployment and portability
+
+<Info>
+For long-running servers, Docker Compose is highly recommended over plain `docker run` commands as it allows for incremental reconfiguration and image upgrades.
+</Info>
+
+## Basic setup
+
+<Steps>
+  <Step title="Create a project directory">
+    Create a new directory for your Minecraft server:
+    
+    ```bash
+    mkdir minecraft-server
+    cd minecraft-server
+    ```
+  </Step>
+
+  <Step title="Create compose.yaml">
+    Create a file named `compose.yaml` with the following content:
+    
+    ```yaml compose.yaml
+    services:
+      mc:
+        image: itzg/minecraft-server:latest
+        pull_policy: daily
+        tty: true
+        stdin_open: true
+        ports:
+          - "25565:25565"
+        environment:
+          EULA: "TRUE"
+        volumes:
+          - ./data:/data
+        restart: unless-stopped
+    ```
+  </Step>
+
+  <Step title="Start the server">
+    Run the server with Docker Compose:
+    
+    ```bash
+    docker compose up -d
+    ```
+    
+    The `-d` flag runs the server in detached mode (background).
+  </Step>
+
+  <Step title="Connect to your server">
+    Point your Minecraft client at `localhost:25565` or your server's IP address.
+  </Step>
+</Steps>
+
+## Managing your server
+
+### View logs
+
+Follow the server logs in real-time:
+
+```bash
+docker compose logs -f
+```
+
+### Check status
+
+View the status of your services:
+
+```bash
+docker compose ps
+```
+
+### Stop the server
+
+Stop the server gracefully:
+
+```bash
+docker compose stop
+```
+
+### Start the server
+
+Start a stopped server:
+
+```bash
+docker compose start
+```
+
+### Apply configuration changes
+
+After editing `compose.yaml`, apply changes:
+
+```bash
+docker compose up -d
+```
+
+### Restart the server
+
+Restart the server (useful for updates when using `VERSION=LATEST`):
+
+```bash
+docker compose restart
+```
+
+### Remove the server
+
+Stop and remove containers (data in volumes is preserved):
+
+```bash
+docker compose down
+```
+
+## Configuration examples
+
+### Paper server with plugins
+
+Run a Paper server with 4GB RAM:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: 1.20.4
+      MEMORY: 4G
+      MAX_PLAYERS: 50
+      VIEW_DISTANCE: 12
+      DIFFICULTY: normal
+      MODE: survival
+      MOTD: "Welcome to my Paper server!"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+### Modded server with CurseForge
+
+Automatic modpack installation from CurseForge:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      CF_API_KEY: ${CF_API_KEY}
+      CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/all-the-mods-9
+      MEMORY: 6G
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+<Note>
+Get a CurseForge API key from [console.curseforge.com](https://console.curseforge.com/) and store it in a `.env` file:
+```bash .env
+CF_API_KEY=your-api-key-here
+```
+</Note>
+
+### Modrinth modpack
+
+Run a Modrinth modpack:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      MODPACK_PLATFORM: MODRINTH
+      MODRINTH_MODPACK: /modpacks/modpack-file.mrpack
+    volumes:
+      - ./data:/data
+      - ./modpacks:/modpacks:ro
+    restart: unless-stopped
+```
+
+### Bedrock-compatible server
+
+Use GeyserMC to allow Bedrock Edition players:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      PLUGINS: |
+        https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot
+        https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot
+    ports:
+      - "25565:25565"  # Java Edition
+      - "19132:19132/udp"  # Bedrock Edition
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+### High-performance server
+
+Optimized configuration for larger servers:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: LATEST
+      MEMORY: 8G
+      MAX_PLAYERS: 100
+      VIEW_DISTANCE: 15
+      SIMULATION_DISTANCE: 10
+      LEVEL_TYPE: LARGEBIOMES
+      MAX_BUILD_HEIGHT: 320
+      DIFFICULTY: hard
+      ENABLE_COMMAND_BLOCK: "true"
+      SPAWN_PROTECTION: 0
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+## Advanced configurations
+
+### Using named volumes
+
+Use Docker-managed named volumes instead of bind mounts:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: 4G
+    volumes:
+      - mc-data:/data
+    restart: unless-stopped
+
+volumes:
+  mc-data:
+```
+
+### Multiple servers
+
+Run multiple Minecraft servers on the same host:
+
+```yaml compose.yaml
+services:
+  vanilla:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      MOTD: "Vanilla Server"
+    volumes:
+      - vanilla-data:/data
+    restart: unless-stopped
+
+  modded:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25566:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      MOTD: "Modded Server"
+      MEMORY: 6G
+    volumes:
+      - modded-data:/data
+    restart: unless-stopped
+
+volumes:
+  vanilla-data:
+  modded-data:
+```
+
+### Server with RCON web admin
+
+Add RCON web interface for remote administration:
+
+```yaml compose.yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: 4G
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "changeme"
+    volumes:
+      - mc-data:/data
+    restart: unless-stopped
+
+  rcon:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+      - "4327:4327"
+    volumes:
+      - rcon-data:/opt/rcon-web-admin/db
+    restart: unless-stopped
+
+volumes:
+  mc-data:
+  rcon-data:
+```
+
+### With automatic backups
+
+Integrate with itzg/mc-backup for scheduled backups:
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    pull_policy: daily
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: 4G
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  backup:
+    image: itzg/mc-backup
+    environment:
+      BACKUP_INTERVAL: "2h"
+      PRUNE_BACKUPS_DAYS: 7
+      RCON_HOST: mc
+      RCON_PASSWORD: "changeme"
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+    depends_on:
+      - mc
+    restart: unless-stopped
+```
+
+## Common environment variables
+
+Here are frequently used environment variables in compose files:
+
+<CodeGroup>
+```yaml Server basics
+EULA: "TRUE"  # Required
+TYPE: PAPER  # VANILLA, PAPER, SPIGOT, FORGE, FABRIC, etc.
+VERSION: 1.20.4  # LATEST, SNAPSHOT, or specific version
+MEMORY: 4G  # RAM allocation
+```
+
+```yaml Server properties
+MAX_PLAYERS: 50
+VIEW_DISTANCE: 12
+SIMULATION_DISTANCE: 10
+DIFFICULTY: normal  # peaceful, easy, normal, hard
+MODE: survival  # survival, creative, adventure, spectator
+MOTD: "Welcome to my server!"
+LEVEL_TYPE: DEFAULT  # DEFAULT, FLAT, LARGEBIOMES, AMPLIFIED
+SEED: "12345"
+PVP: "true"
+```
+
+```yaml World settings
+LEVEL: world  # World name
+GENERATE_STRUCTURES: "true"
+SPAWN_ANIMALS: "true"
+SPAWN_MONSTERS: "true"
+SPAWN_NPCS: "true"
+ALLOW_NETHER: "true"
+```
+
+```yaml Modpack platforms
+MODPACK_PLATFORM: AUTO_CURSEFORGE  # or MODRINTH, FTB
+CF_API_KEY: ${CF_API_KEY}
+CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/...
+```
+</CodeGroup>
+
+## Best practices
+
+<Steps>
+  <Step title="Use version control">
+    Store your `compose.yaml` and configuration in Git for easy rollback and collaboration.
+  </Step>
+
+  <Step title="Set pull_policy">
+    Use `pull_policy: daily` to automatically check for image updates:
+    ```yaml
+    services:
+      mc:
+        pull_policy: daily
+    ```
+  </Step>
+
+  <Step title="Use .env for secrets">
+    Store API keys and passwords in a `.env` file (add to `.gitignore`):
+    ```bash .env
+    CF_API_KEY=your-api-key
+    RCON_PASSWORD=secure-password
+    ```
+  </Step>
+
+  <Step title="Enable restart policy">
+    Always set a restart policy for production:
+    ```yaml
+    restart: unless-stopped
+    ```
+  </Step>
+
+  <Step title="Regular backups">
+    Implement automated backups of your data directory or use the mc-backup container.
+  </Step>
+</Steps>
+
+<Warning>
+Do not commit sensitive information like API keys or passwords to version control. Use `.env` files and add them to `.gitignore`.
+</Warning>
+
+## Configurator tool
+
+If you prefer an interactive tool to generate your `compose.yaml` file, check out [setupmc.com's configurator](https://setupmc.com/java-server/). It provides a form interface that supports most image variables and generates the compose file in real-time.
+
+## Troubleshooting
+
+### Server won't start
+
+Check the logs for errors:
+```bash
+docker compose logs
+```
+
+Common issues:
+- Missing `EULA: "TRUE"`
+- Port 25565 already in use
+- Insufficient memory allocated
+- Invalid configuration values
+
+### Permission errors
+
+If using bind mounts on Linux, you may need to fix permissions:
+```bash
+sudo chown -R 1000:1000 ./data
+```
+
+Or for rootless/SELinux systems, add `:Z` to volumes:
+```yaml
+volumes:
+  - ./data:/data:Z
+```
+
+### Container keeps restarting
+
+View logs to identify the issue:
+```bash
+docker compose logs --tail=50
+```
+
+Temporarily disable auto-restart to debug:
+```yaml
+restart: "no"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Full documentation"
+    icon="book"
+    href="https://docker-minecraft-server.readthedocs.io/"
+  >
+    Explore advanced features like mods, plugins, autopause, and more
+  </Card>
+  <Card
+    title="Examples repository"
+    icon="code"
+    href="https://github.com/itzg/docker-minecraft-server/tree/master/examples"
+  >
+    Browse 40+ ready-to-use example configurations
+  </Card>
+  <Card
+    title="GitHub repository"
+    icon="github"
+    href="https://github.com/itzg/docker-minecraft-server"
+  >
+    View source code and report issues
+  </Card>
+  <Card
+    title="Discord community"
+    icon="discord"
+    href="https://discord.gg/DXfKpjB"
+  >
+    Get help from the community
+  </Card>
+</CardGroup>

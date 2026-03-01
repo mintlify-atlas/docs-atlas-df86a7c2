@@ -1,0 +1,274 @@
+---
+title: Raspberry Pi Support
+description: Run Minecraft servers on ARM devices including Raspberry Pi 3, 4, and newer
+---
+
+The Docker Minecraft Server image supports ARM devices including Raspberry Pi 3 B+, 4, and newer models.
+
+## Supported Devices
+
+This image runs on:
+
+- Raspberry Pi 3 B+ (armv7)
+- Raspberry Pi 4 (armv7/arm64)
+- Raspberry Pi 5 (arm64)
+- Other ARM-based devices with Docker support
+
+## Image Tags
+
+Use any of the image tags that specify `armv7` architecture, including:
+
+- `itzg/minecraft-server:latest`
+- `itzg/minecraft-server:java21`
+- `itzg/minecraft-server:java17`
+
+See the [Java version documentation](/versions/java) for a complete list of supported tags.
+
+## Getting Started
+
+<Steps>
+  <Step title="Pull the image">
+    ```bash
+    docker pull itzg/minecraft-server:latest
+    ```
+  </Step>
+  
+  <Step title="Create docker-compose.yml">
+    ```yaml
+    services:
+      mc:
+        image: itzg/minecraft-server:latest
+        ports:
+          - "25565:25565"
+        environment:
+          EULA: "true"
+          MEMORY: "750m"  # Adjusted for Raspberry Pi
+        volumes:
+          - ./data:/data
+        restart: unless-stopped
+    ```
+  </Step>
+  
+  <Step title="Start the server">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+</Steps>
+
+## Memory Considerations
+
+<Warning>
+Raspberry Pi devices have limited RAM. You may need to lower the memory allocation to prevent out-of-memory errors.
+</Warning>
+
+Recommended memory settings:
+
+| Device | Recommended MEMORY | Notes |
+|--------|-------------------|-------|
+| Pi 3 B+ (1GB RAM) | 512m - 750m | Leave headroom for OS |
+| Pi 4 (2GB RAM) | 1G - 1.5G | Monitor system memory |
+| Pi 4 (4GB RAM) | 2G - 3G | More flexibility |
+| Pi 4 (8GB RAM) | 4G - 6G | Suitable for modded servers |
+| Pi 5 (8GB RAM) | 4G - 6G | Best performance |
+
+Example configuration:
+
+```yaml
+environment:
+  MEMORY: "750m"
+```
+
+## Common Issues and Solutions
+
+<Accordion title="Clock Read Permission Error">
+If you encounter the error:
+
+```
+sleep: cannot read realtime clock: Operation not permitted
+```
+
+<Steps>
+  <Step title="Update libseccomp">
+    Ensure `libseccomp` is up to date on your Raspberry Pi:
+    
+    ```bash
+    sudo apt update
+    sudo apt install libseccomp2
+    ```
+  </Step>
+  
+  <Step title="Try SELinux flag (if needed)">
+    In some cases, adding the `:Z` flag to the volume mount may resolve the issue:
+    
+    ```yaml
+    volumes:
+      - ./data:/data:Z
+    ```
+    
+    <Warning>
+    Use the `:Z` flag cautiously. See [Docker SELinux documentation](https://docs.docker.com/storage/bind-mounts/#configure-the-selinux-label) for more information.
+    </Warning>
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Performance Issues">
+If your server is running slowly:
+
+- **Reduce view distance**: Set `VIEW_DISTANCE=6` or lower
+- **Use lightweight server types**: Consider Paper instead of Vanilla
+- **Limit players**: Reduce `MAX_PLAYERS` to 5-10
+- **Disable unused features**: Turn off complex redstone farms
+- **Use SSD storage**: If possible, run on SSD instead of SD card
+- **Overclock (carefully)**: Consider safe overclocking within thermal limits
+
+Example optimized configuration:
+
+```yaml
+environment:
+  EULA: "true"
+  TYPE: "PAPER"
+  MEMORY: "1G"
+  VIEW_DISTANCE: "6"
+  MAX_PLAYERS: "10"
+  SIMULATION_DISTANCE: "6"
+```
+</Accordion>
+
+<Accordion title="Storage Performance">
+SD cards can be slow and wear out quickly:
+
+- **Use high-quality SD cards**: Class 10 or UHS-I/II cards recommended
+- **Consider USB SSD boot**: Raspberry Pi 4+ supports USB boot
+- **Enable trim**: For SSDs, ensure trim is enabled
+- **Monitor disk health**: Regularly check SD card health
+
+Mount external storage:
+
+```yaml
+volumes:
+  - /mnt/usb-ssd/minecraft:/data
+```
+</Accordion>
+
+## Server Type Recommendations
+
+Different server types have varying resource requirements:
+
+### Lightweight Options (Best for Pi 3/4)
+
+- **Paper**: Optimized Minecraft server with performance improvements
+- **Purpur**: Paper fork with additional optimizations
+- **Vanilla**: Official server (moderate resource usage)
+
+```yaml
+environment:
+  TYPE: "PAPER"
+```
+
+### Resource-Intensive (Pi 4 8GB / Pi 5 only)
+
+- **Forge**: For modded servers (high memory usage)
+- **Fabric**: Lighter than Forge but still resource-intensive
+- **Modpacks**: Require significant RAM
+
+## Cooling and Thermal Management
+
+<Warning>
+Minecraft servers can generate significant CPU load. Proper cooling is essential to prevent thermal throttling.
+</Warning>
+
+Recommendations:
+
+- Use a heatsink and fan case
+- Ensure adequate ventilation
+- Monitor CPU temperature:
+  ```bash
+  vcgencmd measure_temp
+  ```
+- Consider throttling if temperatures exceed 70°C
+
+## Performance Monitoring
+
+Monitor your Raspberry Pi's performance:
+
+```bash
+# Check CPU temperature
+vcgencmd measure_temp
+
+# Check memory usage
+free -h
+
+# Check CPU usage
+htop
+
+# Monitor container stats
+docker stats
+```
+
+## Example Configurations
+
+### Minimal Vanilla Server (Pi 3 B+)
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      MEMORY: "750m"
+      VIEW_DISTANCE: "6"
+      MAX_PLAYERS: "5"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+### Optimized Paper Server (Pi 4 4GB)
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      TYPE: "PAPER"
+      MEMORY: "2G"
+      VIEW_DISTANCE: "8"
+      SIMULATION_DISTANCE: "6"
+      MAX_PLAYERS: "10"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+### Modded Server (Pi 5 8GB)
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      TYPE: "FABRIC"
+      MEMORY: "4G"
+      VIEW_DISTANCE: "8"
+    volumes:
+      - /mnt/ssd/minecraft:/data
+    restart: unless-stopped
+```
+
+## Additional Tips
+
+- **Backup regularly**: SD cards can fail - use automated backups
+- **Use external storage**: For better performance and reliability
+- **Monitor resource usage**: Keep an eye on CPU, memory, and temperature
+- **Update regularly**: Keep both the OS and Docker image updated
+- **Join the community**: Share your Pi setup in the discussions

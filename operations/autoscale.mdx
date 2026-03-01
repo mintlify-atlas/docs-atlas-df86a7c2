@@ -1,0 +1,306 @@
+---
+title: Autoscale Feature
+description: Scale Minecraft servers to zero by sleeping when idle and waking on player join using proxy solutions
+---
+
+Autoscaling (also called *sleeping*, *scale to zero*, or *wake on join*) is the pattern of stopping a Minecraft server when nobody is playing and starting it again when someone tries to connect. This saves resources when the server is not in use, ideal for VPS environments, home servers, or metered cloud platforms.
+
+<Note>
+  Autoscaling differs from [auto-pause](/operations/autopause) and [auto-stop](/operations/autostop). These solutions use external proxies to intercept connections and manage the server container lifecycle.
+</Note>
+
+## Autoscaling Solutions
+
+There are three main solutions for autoscaling Minecraft servers:
+
+1. **mc-router** - Routes by hostname with auto-start/stop
+2. **Lazymc** - Proxy that starts/stops on player join/leave  
+3. **Lazytainer** - Traffic-based container lifecycle management
+
+## mc-router
+
+[mc-router](https://github.com/itzg/mc-router) is a Minecraft-aware router and multiplexer that can:
+
+- Route players by connection hostname (multiple servers behind one port)
+- Auto-start backend containers when players join
+- Auto-stop backend containers after idle timeout
+
+### Features
+
+- **Hostname-based routing** - Direct players to different servers based on their connection address
+- **Automatic container management** - Start/stop containers via Docker API
+- **Multiple server support** - Route to many backend servers from a single port
+- **Transparent to players** - No special client configuration required
+
+### Example Configuration
+
+```yaml
+services:
+  # mc-router proxy
+  router:
+    image: itzg/mc-router
+    ports:
+      - "25565:25565"
+    environment:
+      API_BINDING: ":8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: |
+      --auto-scale-up
+      --auto-scale-down
+      --auto-scale-timeout=30m
+
+  # Backend Minecraft server
+  mc-survival:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.4"
+    labels:
+      mc-router.host: "survival.example.com"
+      mc-router.port: "25565"
+    volumes:
+      - ./survival:/data
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Player connects">
+    Player connects to `survival.example.com:25565`
+  </Step>
+  
+  <Step title="Router intercepts">
+    mc-router intercepts the connection and reads the hostname
+  </Step>
+  
+  <Step title="Container starts">
+    Router starts the matching container via Docker API
+  </Step>
+  
+  <Step title="Connection routed">
+    Once ready, the connection is proxied to the backend server
+  </Step>
+  
+  <Step title="Auto-stop on idle">
+    After the configured timeout with no players, the container stops
+  </Step>
+</Steps>
+
+### When to Use mc-router
+
+- Multiple servers sharing one public port
+- Dynamic server startup based on demand
+- Simplified server routing and management
+- When you need hostname-based routing
+
+See the [mc-router examples](https://github.com/itzg/docker-minecraft-server/blob/master/examples/) for complete configurations.
+
+## Lazymc
+
+[Lazymc](https://github.com/timvisee/lazymc) keeps a server "asleep" until a player connects. It's commonly used with [lazymc-docker-proxy](https://github.com/joesturge/lazymc-docker-proxy) for Docker environments.
+
+### Features
+
+- **Sleep state management** - Keep servers dormant until needed
+- **Fast wake times** - Quickly start servers on connection
+- **Docker integration** - Manage containers via Docker API
+- **Status spoofing** - Show custom MOTD while server is sleeping
+
+### Example Configuration
+
+```yaml
+services:
+  # Lazymc proxy
+  lazymc:
+    image: joesturge/lazymc-docker-proxy
+    environment:
+      SERVER_ADDRESS: mc:25565
+      LAZYMC_GROUP: minecraft
+    ports:
+      - "25565:25565"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - mc
+
+  # Minecraft server
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+    volumes:
+      - ./data:/data
+    networks:
+      default:
+        ipv4_address: 172.20.0.10  # Static IP required
+    labels:
+      - "lazymc.group=minecraft"
+      - "lazymc.enabled=true"
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+```
+
+<Warning>
+  Lazymc requires a static IP address for the Minecraft container on a user-defined network.
+</Warning>
+
+### How It Works
+
+<Steps>
+  <Step title="Server in sleep state">
+    The Minecraft container is stopped, and lazymc listens on port 25565
+  </Step>
+  
+  <Step title="Player attempts connection">
+    Lazymc receives the connection and shows a "waking up" MOTD
+  </Step>
+  
+  <Step title="Container starts">
+    Lazymc starts the Minecraft container via Docker API
+  </Step>
+  
+  <Step title="Connection proxied">
+    Once the server is ready, the connection is handed off
+  </Step>
+  
+  <Step title="Auto-sleep on idle">
+    After timeout with no players, lazymc stops the container
+  </Step>
+</Steps>
+
+### When to Use Lazymc
+
+- Single server deployments
+- Want custom "waking" MOTD messages
+- Need fine-grained control over wake/sleep behavior
+- Prefer lightweight proxy solution
+
+See the [Lazymc examples](https://github.com/itzg/docker-minecraft-server/blob/master/examples/) for complete configurations.
+
+## Lazytainer
+
+[Lazytainer](https://github.com/vmorganp/Lazytainer) starts and stops containers based on network traffic patterns.
+
+### Features
+
+- **Traffic-based triggers** - Monitor packet thresholds
+- **Inactivity timeouts** - Stop containers after idle periods
+- **Multi-protocol support** - Works with any TCP/UDP service
+- **Container orchestration** - Manages multiple containers
+
+### Example Configuration
+
+```yaml
+services:
+  # Lazytainer monitor
+  lazytainer:
+    image: ghcr.io/vmorganp/lazytainer:master
+    environment:
+      VERBOSE: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # Minecraft server
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    labels:
+      - "lazytainer.enable=true"
+      - "lazytainer.group=minecraft"
+      - "lazytainer.minPacketThreshold=2"
+      - "lazytainer.inactiveTimeout=600"
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Container stopped">
+    The Minecraft container is stopped, but port mapping remains active
+  </Step>
+  
+  <Step title="Traffic detected">
+    Lazytainer detects network packets on the monitored port
+  </Step>
+  
+  <Step title="Threshold check">
+    If packet count exceeds threshold, container starts
+  </Step>
+  
+  <Step title="Inactivity monitoring">
+    Lazytainer monitors for inactivity timeout
+  </Step>
+  
+  <Step title="Container stops">
+    After timeout period, container is stopped
+  </Step>
+</Steps>
+
+### When to Use Lazytainer
+
+- Need generic traffic-based scaling
+- Managing multiple services (not just Minecraft)
+- Simple threshold-based triggers
+- Don't need Minecraft-specific features
+
+<Warning>
+  Lazytainer uses packet thresholds, not Minecraft-specific protocols. It can be triggered by port scans or pings in noisy network environments.
+</Warning>
+
+See the [Lazytainer examples](https://github.com/itzg/docker-minecraft-server/blob/master/examples/) for complete configurations.
+
+## Comparison Table
+
+| Feature | mc-router | Lazymc | Lazytainer |
+|---------|-----------|--------|------------|
+| **Protocol aware** | Yes (Minecraft) | Yes (Minecraft) | No (generic TCP/UDP) |
+| **Multi-server** | Yes (routing) | No | No |
+| **Custom MOTD** | No | Yes | No |
+| **Hostname routing** | Yes | No | No |
+| **Static IP required** | No | Yes | No |
+| **Noise resistance** | High | High | Low |
+| **Wake speed** | Fast | Fast | Medium |
+| **Complexity** | Medium | Medium | Low |
+
+## Choosing the Right Solution
+
+### Use mc-router when:
+- You need multiple servers behind one port
+- You want hostname-based routing
+- You need robust Minecraft-aware proxying
+- You're running a network of servers
+
+### Use Lazymc when:
+- You have a single server
+- You want custom wake-up messages
+- You need precise control over sleep/wake behavior
+- Static IPs are acceptable
+
+### Use Lazytainer when:
+- You need simple traffic-based triggers
+- You're managing multiple service types
+- You don't need Minecraft-specific features
+- You're in a low-noise network environment
+
+## Combining with Other Features
+
+<Warning>
+  Autoscaling solutions are **incompatible** with the built-in [auto-pause](/operations/autopause) and [auto-stop](/operations/autostop) features. Use one approach or the other, not both.
+</Warning>
+
+## Resources
+
+- [mc-router GitHub](https://github.com/itzg/mc-router)
+- [Lazymc GitHub](https://github.com/timvisee/lazymc)
+- [lazymc-docker-proxy GitHub](https://github.com/joesturge/lazymc-docker-proxy)
+- [Lazytainer GitHub](https://github.com/vmorganp/Lazytainer)
+- [Example configurations](https://github.com/itzg/docker-minecraft-server/blob/master/examples/)

@@ -1,0 +1,289 @@
+---
+title: Autostop Feature
+description: Automatically stop the Minecraft server container after a period of inactivity to save resources
+---
+
+The auto-stop feature automatically stops the server container after a specified period of inactivity. This is useful for cost-saving scenarios, such as running on AWS Fargate or other metered cloud platforms.
+
+<Warning>
+  Auto-stop is incompatible with the auto-pause feature. They cancel each other out, so only enable one at a time.
+</Warning>
+
+## Enabling Auto-Stop
+
+Enable auto-stop with the `ENABLE_AUTOSTOP` environment variable:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      ENABLE_AUTOSTOP: "TRUE"
+    volumes:
+      - ./data:/data
+    restart: "no"  # Important: set to "no"
+```
+
+<Note>
+  The container's restart policy must be set to `"no"` to prevent automatic restarts. You'll need to manually restart the container after it stops.
+</Note>
+
+## How Auto-Stop Works
+
+<Steps>
+  <Step title="Server starts">
+    The server starts normally and begins monitoring for player connections.
+  </Step>
+  
+  <Step title="Players disconnect">
+    When all players disconnect, the auto-stop timer begins counting down.
+  </Step>
+  
+  <Step title="Timeout reached">
+    If no players reconnect within the configured timeout period, the server stops gracefully.
+  </Step>
+  
+  <Step title="Container stops">
+    The Docker container stops and must be manually restarted.
+  </Step>
+</Steps>
+
+## Configuration Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTOSTOP_TIMEOUT_EST` | `3600` | Seconds between last client disconnect and server stop |
+| `AUTOSTOP_TIMEOUT_INIT` | `1800` | Seconds between server start and stop (if no connections) |
+| `AUTOSTOP_PERIOD` | `10` | Seconds between state machine checks |
+| `AUTOPAUSE_STATUS_RETRY_LIMIT` | `10` | Number of status check retries |
+| `AUTOPAUSE_STATUS_RETRY_INTERVAL` | `2s` | Time between status check retries |
+
+### Example Configuration
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOSTOP: "TRUE"
+      AUTOSTOP_TIMEOUT_EST: "1800"   # Stop after 30 min of no players
+      AUTOSTOP_TIMEOUT_INIT: "900"   # Stop after 15 min if no one joins
+      AUTOSTOP_PERIOD: "5"           # Check every 5 seconds
+    restart: "no"
+```
+
+## Restart Policy Configuration
+
+The container must be configured not to restart automatically:
+
+<CodeGroup>
+```bash Docker Run
+docker run -d \
+  --name mc \
+  --restart=no \
+  -e ENABLE_AUTOSTOP=TRUE \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+```yaml Docker Compose
+services:
+  mc:
+    image: itzg/minecraft-server
+    restart: "no"
+    environment:
+      ENABLE_AUTOSTOP: "TRUE"
+      EULA: "TRUE"
+```
+</CodeGroup>
+
+## Manual Restart
+
+After the server auto-stops, restart it manually:
+
+```bash
+# Restart the container
+docker start mc
+
+# Or with Docker Compose
+docker compose start mc
+```
+
+## Skip Auto-Stop File
+
+Create a `.skip-stop` file in the `/data` directory to temporarily prevent auto-stopping:
+
+```bash
+# Prevent auto-stop
+docker exec mc touch /data/.skip-stop
+
+# Re-enable auto-stop
+docker exec mc rm /data/.skip-stop
+```
+
+<Note>
+  The auto-stop timer resets while the `.skip-stop` file is present.
+</Note>
+
+## Proxy Protocol Support
+
+If you use PROXY Protocol (e.g., through HAProxy or Fly.io), enable it in your server configuration and set:
+
+```yaml
+environment:
+  ENABLE_AUTOSTOP: "TRUE"
+  USES_PROXY_PROTOCOL: "true"
+```
+
+This allows auto-stop to correctly monitor player connections through the proxy.
+
+### Proxy Configuration Examples
+
+**HAProxy:**
+
+```
+server minecraft 10.0.0.10:25565 send-proxy-v2
+```
+
+**Velocity (velocity.toml):**
+
+```toml
+[advanced]
+proxy-protocol = true
+```
+
+**BungeeCord (config.yml):**
+
+```yaml
+proxy_protocol: true
+```
+
+## Use Cases
+
+### AWS Fargate
+
+Reduce costs by stopping when idle:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOSTOP: "TRUE"
+      AUTOSTOP_TIMEOUT_EST: "1800"  # 30 minutes
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+```
+
+### Development Servers
+
+Auto-stop development servers when not in use:
+
+```yaml
+services:
+  mc-dev:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOSTOP: "TRUE"
+      AUTOSTOP_TIMEOUT_INIT: "600"   # Stop after 10 min if unused
+      AUTOSTOP_TIMEOUT_EST: "1200"   # Stop after 20 min of inactivity
+    restart: "no"
+```
+
+### Scheduled Servers
+
+Combine with cron or schedulers for specific play times:
+
+```bash
+#!/bin/bash
+# Start server at 6 PM
+0 18 * * * docker start mc
+
+# Auto-stop will handle shutdown after inactivity
+```
+
+## Troubleshooting
+
+### Enable Debug Logging
+
+Add debug output to see auto-stop behavior:
+
+```yaml
+environment:
+  ENABLE_AUTOSTOP: "TRUE"
+  DEBUG_AUTOSTOP: "true"
+```
+
+### Common Issues
+
+**Container keeps restarting after auto-stop:**
+- Verify restart policy is set to `"no"`
+- Check orchestration system restart settings
+
+**Auto-stop not triggering:**
+- Enable debug logging to see state transitions
+- Verify timeout values are appropriate for your use case
+- Check that players are actually disconnecting
+
+**Server stops immediately after start:**
+- Increase `AUTOSTOP_TIMEOUT_INIT`
+- Check logs for connection issues
+
+**Auto-stop not detecting disconnections with proxy:**
+- Ensure `USES_PROXY_PROTOCOL=true` is set
+- Verify proxy is configured to send PROXY protocol headers
+- Check proxy and server logs for protocol errors
+
+## Monitoring Auto-Stop
+
+Monitor auto-stop events in the logs:
+
+```bash
+# Follow logs to see auto-stop events
+docker logs -f mc | grep -i autostop
+
+# Check if auto-stop is active
+docker exec mc test -f /data/.skip-stop && echo "Disabled" || echo "Enabled"
+```
+
+## Example Compose File
+
+A complete example is available in the [GitHub repository](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-autostop.yml).
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.4"
+      ENABLE_AUTOSTOP: "TRUE"
+      AUTOSTOP_TIMEOUT_EST: "3600"
+      AUTOSTOP_TIMEOUT_INIT: "1800"
+      AUTOSTOP_PERIOD: "10"
+    volumes:
+      - ./data:/data
+    restart: "no"
+```
+
+## Comparison with Auto-Pause
+
+| Feature | Auto-Stop | Auto-Pause |
+|---------|-----------|------------|
+| Container state | Stops container | Pauses Java process |
+| Restart required | Manual | Automatic |
+| Resource usage | Zero (stopped) | Minimal (paused) |
+| Player experience | Must wait for manual restart | Transparent resume |
+| Use case | Cost optimization | Resource optimization |
+| Compatibility | Incompatible with auto-pause | Incompatible with auto-stop |
+
+<Warning>
+  Do not enable both `ENABLE_AUTOSTOP` and `ENABLE_AUTOPAUSE` simultaneously.
+</Warning>

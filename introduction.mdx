@@ -1,0 +1,191 @@
+---
+title: Docker Minecraft Server
+description: Run Minecraft servers in Docker containers with automatic downloads, version management, and extensive configuration options
+---
+
+## Welcome to Docker Minecraft Server
+
+This Docker image provides a Minecraft Server that will automatically download the latest stable version at startup. You can also run or upgrade to any specific version or the latest snapshot.
+
+The image supports all major Minecraft server types including Vanilla, Paper, Spigot, Forge, Fabric, NeoForge, and many more. It includes automated mod and plugin management, backup solutions, and extensive configuration options.
+
+## Get started in minutes
+
+Run a basic Minecraft server with a single command:
+
+```bash
+docker run -d -it -p 25565:25565 -e EULA=TRUE itzg/minecraft-server
+```
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get a server running in under 5 minutes with Docker run commands
+  </Card>
+  <Card
+    title="Docker Compose setup"
+    icon="layer-group"
+    href="/docker-compose"
+  >
+    Use Docker Compose for easier management and configuration
+  </Card>
+</CardGroup>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card
+    title="Automatic updates"
+    icon="arrows-rotate"
+  >
+    Automatically download and update to the latest Minecraft version on container restart
+  </Card>
+  <Card
+    title="Multiple server types"
+    icon="server"
+  >
+    Support for Vanilla, Paper, Spigot, Forge, Fabric, NeoForge, and 15+ other server types
+  </Card>
+  <Card
+    title="Mod and plugin management"
+    icon="puzzle-piece"
+  >
+    Automated downloading and cleanup of mods and plugins from CurseForge, Modrinth, and more
+  </Card>
+  <Card
+    title="Environment-based configuration"
+    icon="sliders"
+  >
+    Configure all server.properties settings via environment variables
+  </Card>
+  <Card
+    title="Modpack support"
+    icon="box"
+  >
+    Direct support for CurseForge, Modrinth, FTB, and custom modpacks
+  </Card>
+  <Card
+    title="Auto-pause and auto-stop"
+    icon="power-off"
+  >
+    Automatically pause or stop the server when no players are connected
+  </Card>
+</CardGroup>
+
+## Supported server types
+
+The image supports the following server types, configurable via the `TYPE` environment variable:
+
+- **VANILLA** - Official Mojang server (default)
+- **PAPER** - High-performance fork with plugin support
+- **SPIGOT** - Popular plugin-based server
+- **FORGE** - Mod loader for extensive modding
+- **FABRIC** - Lightweight mod loader
+- **NEOFORGE** - Modern Forge fork
+- **PURPUR** - Paper fork with extra features
+- **PUFFERFISH** - Performance-focused Paper fork
+- **FOLIA** - Multithreaded Paper fork
+- **QUILT** - Modern Fabric alternative
+- And many more...
+
+## Why Docker for Minecraft?
+
+<CardGroup cols={2}>
+  <Card
+    title="Isolated environment"
+    icon="box-check"
+  >
+    Run multiple servers on the same host without conflicts
+  </Card>
+  <Card
+    title="Easy deployment"
+    icon="cloud-arrow-up"
+  >
+    Deploy to any platform that supports Docker
+  </Card>
+  <Card
+    title="Version control"
+    icon="code-branch"
+  >
+    Manage server configurations with Git and Docker Compose
+  </Card>
+  <Card
+    title="Resource management"
+    icon="gauge-high"
+  >
+    Control memory and CPU usage per container
+  </Card>
+</CardGroup>
+
+## What you'll need
+
+<Steps>
+  <Step title="Docker installed">
+    Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine on your system
+  </Step>
+  <Step title="Accept the EULA">
+    You must accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) by setting `EULA=TRUE` in your configuration
+  </Step>
+  <Step title="Open port 25565">
+    Ensure port 25565 is accessible if you want players to connect from outside your network
+  </Step>
+</Steps>
+
+<Note>
+For production deployments, it's highly recommended to use a management layer such as Docker Compose or Kubernetes to allow for incremental reconfiguration and image upgrades.
+</Note>
+
+## Community and support
+
+<CardGroup cols={2}>
+  <Card
+    title="GitHub Repository"
+    icon="github"
+    href="https://github.com/itzg/docker-minecraft-server"
+  >
+    View source code, report issues, and contribute
+  </Card>
+  <Card
+    title="Discord Community"
+    icon="discord"
+    href="https://discord.gg/DXfKpjB"
+  >
+    Join our Discord server for help and discussion
+  </Card>
+  <Card
+    title="Docker Hub"
+    icon="docker"
+    href="https://hub.docker.com/r/itzg/minecraft-server"
+  >
+    View available tags and download statistics
+  </Card>
+  <Card
+    title="Examples"
+    icon="code"
+    href="https://github.com/itzg/docker-minecraft-server/tree/master/examples"
+  >
+    Browse 40+ example configurations
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick start guide"
+    icon="play"
+    href="/quickstart"
+  >
+    Run your first server in minutes
+  </Card>
+  <Card
+    title="Docker Compose setup"
+    icon="layer-group"
+    href="/docker-compose"
+  >
+    Set up a production-ready server
+  </Card>
+</CardGroup>

@@ -1,0 +1,464 @@
+---
+title: Fabric Server
+description: Lightweight, modern modding platform for Minecraft servers
+---
+
+Fabric is a lightweight, modern modding toolchain for Minecraft that provides a clean, minimal framework for mods. It's designed for quick updates and performance, making it ideal for running modded servers.
+
+## Overview
+
+Fabric offers several advantages for modded Minecraft servers:
+
+- **Quick Updates**: Usually available for new Minecraft versions within hours
+- **Lightweight**: Minimal overhead compared to other modding platforms
+- **Modern Architecture**: Clean API design and good performance
+- **Growing Ecosystem**: Large collection of optimization and content mods
+- **Active Community**: Regular updates and community support
+
+<Note>
+  Fabric mods are NOT compatible with Forge mods. If you need to run both types, consider [hybrid servers](/server-types/hybrids).
+</Note>
+
+## Configuration
+
+### Basic Setup
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-fabric \
+  -e EULA=TRUE \
+  -e TYPE=FABRIC \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+## Version Selection
+
+### Automatic Latest Versions
+
+By default, Fabric installs the latest launcher and loader for your Minecraft version:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.20.4"  # Minecraft version
+```
+
+This configuration automatically:
+- Downloads the latest Fabric server launcher
+- Installs the latest Fabric loader
+- Uses the specified Minecraft version (or latest if omitted)
+
+### Specific Loader Version
+
+Select a specific Fabric loader version:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.20.4"
+  FABRIC_LOADER_VERSION: "0.13.1"
+```
+
+### Specific Launcher Version
+
+Select a specific Fabric launcher version:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  FABRIC_LAUNCHER_VERSION: "0.10.2"
+  FABRIC_LOADER_VERSION: "0.13.1"
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `FABRIC` |
+| `VERSION` | latest | Minecraft version (e.g., `1.20.4`) |
+| `FABRIC_LOADER_VERSION` | latest | Fabric loader version |
+| `FABRIC_LAUNCHER_VERSION` | latest | Fabric launcher version |
+| `FABRIC_LAUNCHER` | - | Path to custom launcher JAR (relative to `/data`) |
+| `FABRIC_LAUNCHER_URL` | - | URL to download custom launcher |
+| `FABRIC_META_BASE_URL` | `https://meta.fabricmc.net` | Fabric meta API base URL |
+| `FABRIC_FORCE_REINSTALL` | `false` | Force reinstall Fabric launcher |
+
+## Installing Fabric API
+
+Most Fabric mods require the Fabric API mod to be installed. The easiest way to install it is using Modrinth:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.20.4"
+  MODRINTH_PROJECTS: |
+    fabric-api
+```
+
+<Note>
+  Fabric API is a library mod that provides essential hooks for other Fabric mods. Almost all Fabric mods depend on it.
+</Note>
+
+## Mod Management
+
+### Manual Mod Installation
+
+Place Fabric mods (`.jar` files) in the `mods` directory:
+
+<Steps>
+  <Step title="Mount mods directory">
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+    ```
+  </Step>
+  
+  <Step title="Add mod files">
+    Download Fabric mods from [Modrinth](https://modrinth.com) or [CurseForge](https://www.curseforge.com/minecraft/mc-mods) and place `.jar` files in `./mods/`.
+  </Step>
+  
+  <Step title="Restart server">
+    ```bash
+    docker restart minecraft-fabric
+    ```
+  </Step>
+</Steps>
+
+### Auto-Download from Modrinth
+
+Automatically download and install Fabric mods from Modrinth:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.20.4"
+  MODRINTH_PROJECTS: |
+    fabric-api
+    lithium
+    phosphor
+    sodium
+```
+
+### Auto-Download from CurseForge
+
+Download mods from CurseForge:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  CF_API_KEY: "your-api-key"
+  CF_SLUG: "fabric-api,lithium"
+```
+
+<Warning>
+  Ensure mods are compatible with both your Minecraft version and Fabric loader version. Check mod requirements before installing.
+</Warning>
+
+## Popular Fabric Mods
+
+### Performance Optimization
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.20.4"
+  MODRINTH_PROJECTS: |
+    fabric-api
+    lithium        # Server optimization
+    phosphor       # Lighting engine optimization  
+    ferritecore    # Memory optimization
+    krypton        # Network optimization
+    c2me-fabric    # Chunk performance
+```
+
+### Server Administration
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    fabric-api
+    fabric-permissions-api
+    luckperms      # Permissions management
+    chunky         # Pre-generation
+```
+
+### Quality of Life
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    fabric-api
+    carpet         # Carpet mod for technical features
+    ledger         # Block logging
+```
+
+## Advanced Configuration
+
+### Custom Fabric Launcher
+
+Use a custom Fabric launcher from a URL:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  FABRIC_LAUNCHER_URL: "http://your-server.com/fabric-server-custom.jar"
+```
+
+Or from a file path (relative to `/data`):
+
+```yaml
+environment:
+  TYPE: FABRIC
+  FABRIC_LAUNCHER: "fabric-server-custom.jar"
+volumes:
+  - ./fabric-server-custom.jar:/data/fabric-server-custom.jar
+```
+
+### Custom Meta API
+
+Use a custom or mirrored Fabric meta API:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  FABRIC_META_BASE_URL: "https://your-mirror.com/fabric-meta"
+```
+
+### Force Reinstall
+
+If the Fabric launcher becomes corrupted:
+
+```yaml
+environment:
+  FABRIC_FORCE_REINSTALL: "true"
+```
+
+<Warning>
+  Remove `FABRIC_FORCE_REINSTALL` after successfully reinstalling.
+</Warning>
+
+## Complete Production Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-fabric
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.20.4"
+      FABRIC_LOADER_VERSION: "0.15.0"
+      
+      # Auto-install Fabric API and optimization mods
+      MODRINTH_PROJECTS: |
+        fabric-api
+        lithium
+        phosphor
+        ferritecore
+        krypton
+        luckperms
+      
+      # Server Settings
+      MOTD: "A Fabric Minecraft Server"
+      DIFFICULTY: normal
+      MODE: survival
+      MAX_PLAYERS: 50
+      VIEW_DISTANCE: 12
+      SIMULATION_DISTANCE: 8
+      
+      # Performance
+      MEMORY: 6G
+      USE_AIKAR_FLAGS: "true"
+      
+      # World
+      LEVEL: "world"
+      SEED: "fabric-world"
+      
+      # Security
+      ENABLE_WHITELIST: "false"
+      ONLINE_MODE: "true"
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./config:/data/config
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Mod Configuration
+
+### Config Files
+
+Mod configurations are stored in the `config` directory:
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./config:/data/config
+```
+
+Each mod typically creates its own config file:
+- `./config/lithium.properties`
+- `./config/phosphor.properties`
+- `./config/carpet.conf`
+
+### Server-Side vs Client-Side Mods
+
+**Server-Side Mods** (work on server only):
+- Lithium (performance)
+- Phosphor (lighting)
+- Carpet (technical features)
+- FerriteCore (memory)
+
+**Client-Side Mods** (require client installation):
+- Sodium (rendering)
+- Iris (shaders)
+- Mod Menu
+
+**Universal Mods** (work on both):
+- Fabric API
+- Many content mods
+
+<Note>
+  Only install server-side or universal mods on your server. Client-side rendering mods won't work on servers.
+</Note>
+
+## Performance Tuning
+
+### Recommended Mods for Performance
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    fabric-api
+    lithium        # Overall performance
+    phosphor       # Lighting performance
+    ferritecore    # Memory usage reduction
+    krypton        # Network performance
+    c2me-fabric    # Chunk performance
+    starlight      # Alternative lighting engine
+```
+
+### Memory Allocation
+
+```yaml
+environment:
+  MEMORY: 6G  # For modded servers with 20-30 players
+  USE_AIKAR_FLAGS: "true"
+```
+
+| Players | Mods | Recommended RAM |
+|---------|------|----------------|
+| 1-10 | Light | 4GB |
+| 10-20 | Medium | 6GB |
+| 20-50 | Medium | 8GB |
+| 50+ | Heavy | 12GB+ |
+
+## Troubleshooting
+
+### Corrupted Launcher
+
+Force reinstall the Fabric launcher:
+
+```yaml
+environment:
+  FABRIC_FORCE_REINSTALL: "true"
+```
+
+### Mod Compatibility Issues
+
+1. Check mod requirements on Modrinth/CurseForge
+2. Verify Minecraft version compatibility
+3. Ensure Fabric API is installed
+4. Check server logs for specific errors
+
+### Version Mismatch
+
+If mods fail to load:
+
+1. Verify mod supports your Minecraft version
+2. Check Fabric loader version compatibility
+3. Update mods to compatible versions
+
+## Migration Guide
+
+### From Vanilla to Fabric
+
+<Steps>
+  <Step title="Backup your world">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Update configuration">
+    ```yaml
+    environment:
+      TYPE: FABRIC  # Changed from VANILLA
+      VERSION: "1.20.4"
+      MODRINTH_PROJECTS: |
+        fabric-api
+    ```
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Your vanilla world will work with Fabric.
+  </Step>
+</Steps>
+
+<Warning>
+  Players will need to install Fabric and your server's mods on their clients to connect.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Modrinth Integration" icon="download" href="/mods-and-plugins/modrinth">
+    Auto-download mods from Modrinth
+  </Card>
+  <Card title="CurseForge Mods" icon="fire" href="/mods-and-plugins/curseforge">
+    Install CurseForge modpacks
+  </Card>
+  <Card title="Quilt Server" icon="mitten" href="/server-types/quilt">
+    Try Quilt, a Fabric fork with enhancements
+  </Card>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Run Fabric mods with plugins
+  </Card>
+</CardGroup>

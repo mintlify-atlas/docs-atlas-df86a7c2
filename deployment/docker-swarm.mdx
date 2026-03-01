@@ -1,0 +1,811 @@
+---
+title: Docker Swarm Deployment
+description: Deploy Minecraft servers on Docker Swarm with service replication, load balancing, and rolling updates
+---
+
+Docker Swarm provides native clustering and orchestration capabilities for deploying containerized Minecraft servers across multiple nodes with high availability.
+
+## Overview
+
+Docker Swarm offers several advantages for Minecraft server deployment:
+
+<CardGroup cols={2}>
+  <Card title="Native Clustering" icon="server">
+    Built-in orchestration without external dependencies
+  </Card>
+  
+  <Card title="Service Management" icon="gears">
+    Declarative service definitions with automatic reconciliation
+  </Card>
+  
+  <Card title="Rolling Updates" icon="rotate">
+    Zero-downtime updates with configurable strategies
+  </Card>
+  
+  <Card title="Load Balancing" icon="scale-balanced">
+    Built-in ingress load balancing for services
+  </Card>
+</CardGroup>
+
+<Note>
+  While Swarm provides orchestration, remember that Minecraft servers are stateful and typically run as single replicas.
+</Note>
+
+## Initialize Swarm
+
+First, initialize a Swarm cluster:
+
+<Steps>
+  <Step title="Initialize the manager node">
+    ```bash
+    docker swarm init
+    ```
+    
+    This outputs a join token for worker nodes.
+  </Step>
+  
+  <Step title="Add worker nodes (optional)">
+    On each worker node:
+    ```bash
+    docker swarm join --token SWMTKN-1-xxx manager-ip:2377
+    ```
+  </Step>
+  
+  <Step title="Verify cluster">
+    ```bash
+    docker node ls
+    ```
+  </Step>
+</Steps>
+
+## Stack Deployment
+
+### Basic Stack
+
+Create a `minecraft-stack.yml` file:
+
+```yaml minecraft-stack.yml
+version: '3.8'
+
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    ports:
+      - "25565:25565"
+    volumes:
+      - minecraft-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.4"
+      MEMORY: "4G"
+      DIFFICULTY: normal
+      MAX_PLAYERS: 50
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+    networks:
+      - minecraft
+
+volumes:
+  minecraft-data:
+    driver: local
+
+networks:
+  minecraft:
+    driver: overlay
+```
+
+<Steps>
+  <Step title="Deploy the stack">
+    ```bash
+    docker stack deploy -c minecraft-stack.yml mc
+    ```
+  </Step>
+  
+  <Step title="Verify deployment">
+    ```bash
+    docker stack services mc
+    docker service ls
+    ```
+  </Step>
+  
+  <Step title="View logs">
+    ```bash
+    docker service logs -f mc_minecraft
+    ```
+  </Step>
+</Steps>
+
+### Stack with RCON
+
+Add RCON web admin to your stack:
+
+```yaml minecraft-stack-rcon.yml
+version: '3.8'
+
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - minecraft-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: "4G"
+      ENABLE_RCON: "TRUE"
+      RCON_PASSWORD_FILE: /run/secrets/rcon_password
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.minecraft == true
+      restart_policy:
+        condition: on-failure
+    secrets:
+      - rcon_password
+    networks:
+      - minecraft
+
+  rcon:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+      - "4327:4327"
+    volumes:
+      - rcon-data:/opt/rcon-web-admin/db
+    environment:
+      RWA_USERNAME: admin
+      RWA_PASSWORD_FILE: /run/secrets/rcon_admin_password
+      RWA_RCON_HOST: minecraft
+      RWA_RCON_PASSWORD_FILE: /run/secrets/rcon_password
+    deploy:
+      replicas: 1
+    secrets:
+      - rcon_password
+      - rcon_admin_password
+    networks:
+      - minecraft
+    depends_on:
+      - minecraft
+
+volumes:
+  minecraft-data:
+  rcon-data:
+
+networks:
+  minecraft:
+    driver: overlay
+    attachable: true
+
+secrets:
+  rcon_password:
+    external: true
+  rcon_admin_password:
+    external: true
+```
+
+Create the secrets before deploying:
+
+```bash
+echo "your-rcon-password" | docker secret create rcon_password -
+echo "admin-panel-password" | docker secret create rcon_admin_password -
+
+docker stack deploy -c minecraft-stack-rcon.yml mc
+```
+
+## Deploy Configuration
+
+### Placement Constraints
+
+Control where services run:
+
+```yaml
+deploy:
+  placement:
+    constraints:
+      # Run on manager nodes only
+      - node.role == manager
+      
+      # Run on nodes with specific label
+      - node.labels.minecraft == true
+      
+      # Run on nodes with SSD storage
+      - node.labels.storage == ssd
+      
+      # Multiple constraints
+      - node.role == worker
+      - node.labels.region == us-east
+```
+
+Set node labels:
+
+```bash
+docker node update --label-add minecraft=true node-1
+docker node update --label-add storage=ssd node-1
+```
+
+### Resource Limits
+
+Define resource reservations and limits:
+
+```yaml
+deploy:
+  resources:
+    reservations:
+      cpus: '2.0'
+      memory: 4G
+    limits:
+      cpus: '4.0'
+      memory: 8G
+```
+
+### Restart Policies
+
+Configure service restart behavior:
+
+```yaml
+deploy:
+  restart_policy:
+    condition: on-failure    # on-failure, any, or none
+    delay: 5s               # Delay between restarts
+    max_attempts: 3         # Max restart attempts
+    window: 120s            # Window to evaluate restart
+```
+
+### Update Configuration
+
+Control how updates are applied:
+
+```yaml
+deploy:
+  update_config:
+    parallelism: 1          # Update 1 task at a time
+    delay: 10s              # Wait 10s between updates
+    failure_action: rollback # rollback, pause, or continue
+    monitor: 60s            # Monitor period
+    max_failure_ratio: 0.3  # Max failures before rollback
+    order: stop-first       # stop-first or start-first
+```
+
+## Advanced Stack Configurations
+
+### Multiple Servers Stack
+
+Run multiple Minecraft servers:
+
+```yaml multi-server-stack.yml
+version: '3.8'
+
+services:
+  survival:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - survival-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: "4G"
+      DIFFICULTY: hard
+      LEVEL_TYPE: DEFAULT
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.server == survival
+    networks:
+      - minecraft
+
+  creative:
+    image: itzg/minecraft-server
+    ports:
+      - "25566:25565"
+    volumes:
+      - creative-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: "2G"
+      MODE: creative
+      DIFFICULTY: peaceful
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.server == creative
+    networks:
+      - minecraft
+
+  minigames:
+    image: itzg/minecraft-server
+    ports:
+      - "25567:25565"
+    volumes:
+      - minigames-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: SPIGOT
+      MEMORY: "3G"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.server == minigames
+    networks:
+      - minecraft
+
+volumes:
+  survival-data:
+  creative-data:
+  minigames-data:
+
+networks:
+  minecraft:
+    driver: overlay
+```
+
+### Stack with Monitoring
+
+Add monitoring services:
+
+```yaml minecraft-monitored-stack.yml
+version: '3.8'
+
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - minecraft-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      MEMORY: "4G"
+      ENABLE_JMX: "TRUE"
+      JMX_PORT: 7091
+    deploy:
+      replicas: 1
+    networks:
+      - minecraft
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    deploy:
+      replicas: 1
+    networks:
+      - monitoring
+
+volumes:
+  minecraft-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  minecraft:
+    driver: overlay
+  monitoring:
+    driver: overlay
+```
+
+## Service Management
+
+### Deploy and Update
+
+```bash
+# Deploy new stack
+docker stack deploy -c minecraft-stack.yml mc
+
+# Update stack (apply changes)
+docker stack deploy -c minecraft-stack.yml mc
+
+# Force update service
+docker service update --force mc_minecraft
+
+# Update service image
+docker service update --image itzg/minecraft-server:java21 mc_minecraft
+```
+
+### Scaling
+
+<Warning>
+  Don't scale Minecraft servers beyond 1 replica - they maintain state and cannot be load balanced.
+</Warning>
+
+For auxiliary services:
+
+```bash
+# Scale RCON service (if stateless)
+docker service scale mc_rcon=3
+```
+
+### Rollback
+
+```bash
+# Rollback to previous version
+docker service rollback mc_minecraft
+
+# Check rollback status
+docker service ps mc_minecraft
+```
+
+### Remove Stack
+
+```bash
+# Remove entire stack
+docker stack rm mc
+
+# Verify removal
+docker stack ls
+docker service ls
+```
+
+## Secrets Management
+
+Swarm secrets provide secure credential storage:
+
+<Steps>
+  <Step title="Create secrets">
+    ```bash
+    # From stdin
+    echo "my-password" | docker secret create rcon_password -
+    
+    # From file
+    docker secret create server_properties ./server.properties
+    ```
+  </Step>
+  
+  <Step title="Use in stack">
+    ```yaml
+    services:
+      minecraft:
+        secrets:
+          - rcon_password
+          - source: server_properties
+            target: /data/server.properties
+    
+    secrets:
+      rcon_password:
+        external: true
+      server_properties:
+        external: true
+    ```
+  </Step>
+  
+  <Step title="Access in container">
+    Secrets are mounted at `/run/secrets/<secret_name>`
+    
+    ```yaml
+    environment:
+      RCON_PASSWORD_FILE: /run/secrets/rcon_password
+    ```
+  </Step>
+</Steps>
+
+### List and Remove Secrets
+
+```bash
+# List secrets
+docker secret ls
+
+# Inspect secret (metadata only)
+docker secret inspect rcon_password
+
+# Remove secret
+docker secret rm rcon_password
+```
+
+## Configs
+
+Configs are similar to secrets but for non-sensitive data:
+
+```bash
+# Create config
+docker config create server_properties ./server.properties
+```
+
+```yaml
+services:
+  minecraft:
+    configs:
+      - source: server_properties
+        target: /data/server.properties
+        mode: 0440
+
+configs:
+  server_properties:
+    external: true
+```
+
+## Networking
+
+### Overlay Networks
+
+Overlay networks span multiple nodes:
+
+```yaml
+networks:
+  minecraft:
+    driver: overlay
+    attachable: true  # Allow non-swarm containers to connect
+    driver_opts:
+      encrypted: "true"  # Encrypt network traffic
+```
+
+### Published Ports
+
+```yaml
+services:
+  minecraft:
+    ports:
+      # Long syntax
+      - target: 25565      # Container port
+        published: 25565   # Host port
+        protocol: tcp
+        mode: host         # host or ingress
+```
+
+**Mode differences:**
+- `ingress` (default): Load balanced across all nodes
+- `host`: Direct binding to host port
+
+<Note>
+  Use `mode: host` for Minecraft to ensure clients connect to the same server instance.
+</Note>
+
+## Volume Management
+
+### Named Volumes
+
+```yaml
+volumes:
+  minecraft-data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=nfs-server.example.com,rw
+      device: ":/path/to/data"
+```
+
+### Volume Drivers
+
+Use volume plugins for distributed storage:
+
+```bash
+# Install NFS volume plugin
+docker plugin install --grant-all-permissions vieux/sshfs
+```
+
+```yaml
+volumes:
+  minecraft-data:
+    driver: vieux/sshfs
+    driver_opts:
+      sshcmd: "user@server:/path"
+      password: "password"
+```
+
+## Monitoring and Logs
+
+### Service Logs
+
+```bash
+# Follow service logs
+docker service logs -f mc_minecraft
+
+# Last 100 lines
+docker service logs --tail 100 mc_minecraft
+
+# Logs since timestamp
+docker service logs --since 2024-01-01T00:00:00 mc_minecraft
+
+# Include timestamps
+docker service logs --timestamps mc_minecraft
+```
+
+### Service Status
+
+```bash
+# List all services
+docker service ls
+
+# Inspect service
+docker service inspect mc_minecraft
+
+# Service tasks (replicas)
+docker service ps mc_minecraft
+
+# Service details
+docker service inspect --pretty mc_minecraft
+```
+
+### Stack Information
+
+```bash
+# List stacks
+docker stack ls
+
+# Stack services
+docker stack services mc
+
+# Stack tasks
+docker stack ps mc
+```
+
+## High Availability
+
+### Manager Node Quorum
+
+For production, use 3 or 5 manager nodes:
+
+```bash
+# On additional manager nodes
+docker swarm join-token manager
+```
+
+**Quorum requirements:**
+- 3 managers: tolerates 1 failure
+- 5 managers: tolerates 2 failures
+- 7 managers: tolerates 3 failures
+
+### Node Availability
+
+```bash
+# Drain node (no new tasks)
+docker node update --availability drain node-1
+
+# Activate node
+docker node update --availability active node-1
+
+# Pause node (stop scheduling)
+docker node update --availability pause node-1
+```
+
+## Backup and Disaster Recovery
+
+### Backup Data
+
+```bash
+# Find volume location
+docker volume inspect mc_minecraft-data
+
+# Create backup
+docker run --rm -v mc_minecraft-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/minecraft-backup.tar.gz /data
+```
+
+### Restore Data
+
+```bash
+# Restore from backup
+docker run --rm -v mc_minecraft-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/minecraft-backup.tar.gz -C /
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Placement Constraints" icon="location-dot">
+    Pin stateful services to specific nodes to ensure data persistence
+  </Card>
+  
+  <Card title="Implement Health Checks" icon="heart-pulse">
+    Add health checks to detect and recover from failures automatically
+  </Card>
+  
+  <Card title="Manage Secrets Securely" icon="lock">
+    Use Docker secrets for passwords and sensitive configuration
+  </Card>
+  
+  <Card title="Monitor Resources" icon="gauge">
+    Set resource limits and monitor usage to prevent node exhaustion
+  </Card>
+  
+  <Card title="Use Overlay Networks" icon="network-wired">
+    Leverage overlay networks for secure multi-node communication
+  </Card>
+  
+  <Card title="Regular Backups" icon="floppy-disk">
+    Implement automated backup strategies for world data
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Service Won't Start
+
+```bash
+# Check service status
+docker service ps --no-trunc mc_minecraft
+
+# View logs
+docker service logs mc_minecraft
+
+# Inspect service
+docker service inspect mc_minecraft
+```
+
+### Networking Issues
+
+```bash
+# List networks
+docker network ls
+
+# Inspect network
+docker network inspect mc_minecraft
+
+# Test connectivity
+docker run --rm --network mc_minecraft alpine ping minecraft
+```
+
+### Volume Issues
+
+```bash
+# List volumes
+docker volume ls
+
+# Inspect volume
+docker volume inspect mc_minecraft-data
+
+# Check volume contents
+docker run --rm -v mc_minecraft-data:/data alpine ls -la /data
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment Examples" icon="code" href="/deployment/examples">
+    Explore more deployment configurations and patterns
+  </Card>
+  
+  <Card title="Kubernetes" icon="dharmachakra" href="/deployment/kubernetes">
+    Compare with Kubernetes deployment options
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Docker Swarm Documentation](https://docs.docker.com/engine/swarm/)
+- [Docker Stack Reference](https://docs.docker.com/engine/reference/commandline/stack/)
+- [Swarm Mode Tutorial](https://docs.docker.com/engine/swarm/swarm-tutorial/)

@@ -1,0 +1,74 @@
+---
+title: Log4j Vulnerability Mitigation
+description: Automatic protection against Log4j security vulnerabilities
+---
+
+The Docker Minecraft Server image automatically applies all official Log4j vulnerability mitigations during container startup.
+
+## Automatic Protection
+
+All [official Log4j mitigations](https://www.minecraft.net/en-us/article/important-message--security-vulnerability-java-edition) released by Mojang are automatically applied by the container startup process.
+
+<Note>
+**Please ensure you have pulled the latest image** to receive the most recent security patches and mitigations.
+</Note>
+
+## How It Works
+
+The container includes built-in Log4jPatcher functionality that:
+
+1. Detects vulnerable Log4j versions in your Minecraft server JAR files
+2. Automatically applies the appropriate patches during startup
+3. Protects against known CVE vulnerabilities including CVE-2021-44228 (Log4Shell)
+4. Works with all server types (Vanilla, Paper, Spigot, Forge, Fabric, etc.)
+
+## Updating Your Image
+
+To ensure you have the latest security patches:
+
+<Steps>
+  <Step title="Pull the latest image">
+    ```bash
+    docker pull itzg/minecraft-server:latest
+    ```
+  </Step>
+  
+  <Step title="Restart your container">
+    ```bash
+    docker compose down
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify the update">
+    Check the container logs for Log4j patching messages during startup.
+  </Step>
+</Steps>
+
+## Verification
+
+When your container starts, you should see log messages indicating that Log4j patching has been applied (if needed). The patcher will:
+
+- Report which JAR files were scanned
+- Indicate if vulnerabilities were found
+- Confirm successful patching
+
+<Warning>
+Never disable Log4j patching. The automatic patching process is a critical security feature.
+</Warning>
+
+## Additional Security Best Practices
+
+Beyond Log4j patching, consider these security measures:
+
+- **Keep images updated**: Regularly pull the latest image to receive security updates
+- **Use specific version tags**: Consider using version-specific tags (e.g., `java21`) for production
+- **Monitor security advisories**: Watch the [official repository](https://github.com/itzg/docker-minecraft-server) for security announcements
+- **Limit network exposure**: Use firewalls and network policies to restrict access
+- **Review server logs**: Regularly check logs for suspicious activity
+
+## Related Resources
+
+- [Minecraft Official Security Announcement](https://www.minecraft.net/en-us/article/important-message--security-vulnerability-java-edition)
+- [Docker Minecraft Server GitHub Repository](https://github.com/itzg/docker-minecraft-server)
+- [mc-image-helper](https://github.com/itzg/mc-image-helper) - The tool that provides Log4j patching functionality

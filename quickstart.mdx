@@ -1,80 +1,293 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Get a Minecraft server running in minutes with Docker
 ---
 
-## Get started in three steps
+## Run your first server
 
-Get your documentation site running locally and make your first customization.
+Get a basic Minecraft server running in under 5 minutes using Docker run commands.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Accept the Minecraft EULA">
+    Before running any server, you must accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) by including `-e EULA=TRUE` in all commands.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <Warning>
+    The server will not start without `EULA=TRUE` set. This is a requirement from Mojang/Microsoft.
+    </Warning>
+  </Step>
+
+  <Step title="Run the basic server">
+    Execute this command to start a server with the latest Minecraft version:
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    ```bash
+    docker run -d -it -p 25565:25565 -e EULA=TRUE itzg/minecraft-server
+    ```
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    This command:
+    - Downloads and runs the latest vanilla Minecraft server
+    - Exposes port 25565 for player connections
+    - Runs in detached mode (`-d`)
+    - Enables interactive terminal (`-it`) for console access
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Connect to your server">
+    Open Minecraft, go to Multiplayer, and connect to:
+    - **localhost:25565** (if playing on the same machine)
+    - **your-ip-address:25565** (if connecting from another machine)
+  </Step>
+</Steps>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Info>
+The server data is stored in an anonymous Docker volume. To persist your world and configuration, see the [persistent data](#persistent-data) section below.
+</Info>
 
-### Step 3: Go live
+## Persistent data
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+The Minecraft server stores all its data in the container's `/data` directory. To keep your world and configuration when the container is removed, mount a volume or directory.
+
+### Using a host directory
+
+Mount a directory from your host machine to persist the server data:
+
+```bash
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -v /path/on/host:/data \
+  itzg/minecraft-server
+```
+
+Replace `/path/on/host` with the actual path where you want to store the server data, such as:
+- Linux/Mac: `/home/user/minecraft-data`
+- Windows: `C:\Users\username\minecraft-data`
+
+<Note>
+For rootless containers (Podman) or systems using SELinux/AppArmor, append `:Z` to the volume mapping:
+```bash
+-v /path/on/host:/data:Z
+```
+</Note>
+
+### Using a named volume
+
+Create and use a named Docker volume:
+
+```bash
+# Create a named volume
+docker volume create minecraft-data
+
+# Run the server with the named volume
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -v minecraft-data:/data \
+  itzg/minecraft-server
+```
+
+## Common configurations
+
+### Specific Minecraft version
+
+Run a specific version instead of the latest:
+
+<CodeGroup>
+```bash Latest release
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e VERSION=LATEST \
+  itzg/minecraft-server
+```
+
+```bash Specific version
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e VERSION=1.20.4 \
+  itzg/minecraft-server
+```
+
+```bash Latest snapshot
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e VERSION=SNAPSHOT \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+### Different server types
+
+Run Paper, Spigot, Forge, or other server types:
+
+<CodeGroup>
+```bash Paper server
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e TYPE=PAPER \
+  itzg/minecraft-server
+```
+
+```bash Spigot server
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e TYPE=SPIGOT \
+  -e VERSION=1.20.4 \
+  itzg/minecraft-server
+```
+
+```bash Fabric server
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e TYPE=FABRIC \
+  itzg/minecraft-server
+```
+
+```bash Forge server
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e TYPE=FORGE \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+### Server properties
+
+Configure server settings using environment variables:
+
+```bash
+docker run -d -it -p 25565:25565 \
+  -e EULA=TRUE \
+  -e MEMORY=4G \
+  -e MAX_PLAYERS=100 \
+  -e VIEW_DISTANCE=15 \
+  -e LEVEL_TYPE=LARGEBIOMES \
+  -e MOTD="Welcome to my server!" \
+  -e DIFFICULTY=hard \
+  -e MODE=survival \
+  -v minecraft-data:/data \
+  itzg/minecraft-server
+```
+
+<Info>
+All standard `server.properties` entries can be set via environment variables. The variable names match the property names in uppercase.
+</Info>
+
+## Managing your server
+
+### View server logs
+
+Follow the server console output:
+
+```bash
+docker logs -f <container-name-or-id>
+```
+
+### Stop the server
+
+Gracefully stop the server:
+
+```bash
+docker stop <container-name-or-id>
+```
+
+### Start the server
+
+Start a stopped container:
+
+```bash
+docker start <container-name-or-id>
+```
+
+### Access server console
+
+Attach to the server console for commands:
+
+```bash
+docker attach <container-name-or-id>
+```
+
+Press `Ctrl+P, Ctrl+Q` to detach without stopping the server.
+
+### Restart for updates
+
+When using `VERSION=LATEST` or `VERSION=SNAPSHOT`, simply restart the container to upgrade:
+
+```bash
+docker restart <container-name-or-id>
+```
+
+## Common environment variables
+
+Here are the most commonly used environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EULA` | - | Must be set to `TRUE` to accept the Minecraft EULA |
+| `VERSION` | `LATEST` | Minecraft version: `LATEST`, `SNAPSHOT`, or specific version like `1.20.4` |
+| `TYPE` | `VANILLA` | Server type: `VANILLA`, `PAPER`, `SPIGOT`, `FORGE`, `FABRIC`, etc. |
+| `MEMORY` | `1G` | JVM memory allocation, e.g., `2G`, `4G`, `8G` |
+| `MAX_PLAYERS` | `20` | Maximum number of players |
+| `VIEW_DISTANCE` | `10` | Server view distance in chunks |
+| `DIFFICULTY` | `easy` | Game difficulty: `peaceful`, `easy`, `normal`, `hard` |
+| `MODE` | `survival` | Game mode: `survival`, `creative`, `adventure`, `spectator` |
+| `MOTD` | Auto-generated | Server message of the day |
+| `LEVEL_TYPE` | `DEFAULT` | World type: `DEFAULT`, `FLAT`, `LARGEBIOMES`, `AMPLIFIED` |
+| `SEED` | - | World generation seed |
+| `PVP` | `true` | Enable player vs player combat |
+| `ALLOW_NETHER` | `true` | Enable the Nether dimension |
+
+<Note>
+For a complete list of available environment variables and server types, see the [full documentation](https://docker-minecraft-server.readthedocs.io/).
+</Note>
+
+## Example: Complete server setup
+
+Here's a complete example with common settings:
+
+```bash
+docker run -d \
+  --name minecraft \
+  -p 25565:25565 \
+  -e EULA=TRUE \
+  -e TYPE=PAPER \
+  -e VERSION=1.20.4 \
+  -e MEMORY=4G \
+  -e MAX_PLAYERS=50 \
+  -e VIEW_DISTANCE=12 \
+  -e DIFFICULTY=normal \
+  -e MODE=survival \
+  -e MOTD="My Awesome Minecraft Server" \
+  -e ENABLE_COMMAND_BLOCK=true \
+  -e SPAWN_PROTECTION=0 \
+  -v ~/minecraft-data:/data \
+  --restart unless-stopped \
+  -it \
+  itzg/minecraft-server
+```
+
+This configuration:
+- Runs a Paper server on Minecraft 1.20.4
+- Allocates 4GB of RAM
+- Supports up to 50 players
+- Persists data to `~/minecraft-data`
+- Automatically restarts unless manually stopped
+- Uses normal difficulty and survival mode
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Docker Compose setup"
+    icon="layer-group"
+    href="/docker-compose"
+  >
+    Learn how to use Docker Compose for easier management
+  </Card>
+  <Card
+    title="Full documentation"
+    icon="book"
+    href="https://docker-minecraft-server.readthedocs.io/"
+  >
+    Explore advanced features like mods, plugins, and backups
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+<Warning>
+Remember to regularly backup your `/data` directory to prevent world data loss. Consider using automated backup solutions or volume snapshots.
+</Warning>

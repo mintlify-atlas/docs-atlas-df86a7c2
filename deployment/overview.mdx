@@ -1,0 +1,383 @@
+---
+title: Deployment Overview
+description: Learn about different deployment options and architectures for running Minecraft servers with Docker
+---
+
+The Docker Minecraft Server can be deployed in various environments and architectures, from simple single-container setups to complex orchestrated deployments with auto-scaling capabilities.
+
+## Deployment Options
+
+### Docker Compose
+
+The most common and recommended way to deploy is using Docker Compose, which provides:
+
+- Easy configuration management
+- Volume and network orchestration
+- Service dependencies
+- Restart policies
+- Environment variable management
+
+<CardGroup cols={2}>
+  <Card title="Simple Deployment" icon="rocket" href="#simple-compose">
+    Basic single-server setup with persistent storage
+  </Card>
+  <Card title="Advanced Features" icon="gears" href="#advanced-compose">
+    Multi-service deployments with RCON, proxies, and more
+  </Card>
+</CardGroup>
+
+### Kubernetes
+
+For production environments requiring:
+
+- High availability
+- Auto-scaling
+- Resource management
+- StatefulSets for persistent data
+
+See the [Kubernetes deployment guide](/deployment/kubernetes) for detailed information.
+
+### Docker Swarm
+
+Swarm mode provides:
+
+- Native Docker clustering
+- Service replication
+- Load balancing
+- Rolling updates
+
+See the [Docker Swarm guide](/deployment/docker-swarm) for stack configurations.
+
+## Simple Compose
+
+The simplest deployment requires just a few lines:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    stdin_open: true
+    tty: true
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    environment:
+      EULA: "TRUE"
+    restart: unless-stopped
+```
+
+<Steps>
+  <Step title="Create compose file">
+    Save the configuration above as `docker-compose.yml`
+  </Step>
+  
+  <Step title="Start the server">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="View logs">
+    ```bash
+    docker compose logs -f
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The `stdin_open` and `tty` options enable interactive console access via `docker attach`.
+</Note>
+
+## Advanced Compose
+
+A production-ready deployment with resource limits and named volumes:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: mc-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc-data:/data"
+    environment:
+      EULA: "TRUE"
+      MAX_MEMORY: 32G
+      MAX_BUILD_HEIGHT: 256
+      VIEW_DISTANCE: 15
+      LEVEL_TYPE: LARGEBIOMES
+      MAX_PLAYERS: 100
+      CONSOLE: "false"
+    restart: always
+    
+  rcon:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+      - "4327:4327"
+    volumes:
+      - "rcon:/opt/rcon-web-admin/db"
+
+volumes:
+  mc-data:
+  rcon:
+```
+
+### Key Configuration Elements
+
+<AccordionGroup>
+  <Accordion title="Volume Mounts">
+    **Named volumes** (recommended for production):
+    ```yaml
+    volumes:
+      - "mc-data:/data"
+    ```
+    
+    **Bind mounts** (easier for development):
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./mods:/mods
+    ```
+    
+    Named volumes are managed by Docker and persist independently of the container lifecycle.
+  </Accordion>
+
+  <Accordion title="Port Mappings">
+    **Standard Minecraft port**:
+    ```yaml
+    ports:
+      - "25565:25565"  # host:container
+    ```
+    
+    **Custom external port**:
+    ```yaml
+    ports:
+      - "30000:25565"  # Listen on port 30000
+    ```
+    
+    **Multiple servers**:
+    ```yaml
+    # Server 1
+    ports:
+      - "25565:25565"
+    
+    # Server 2
+    ports:
+      - "25566:25565"
+    ```
+  </Accordion>
+
+  <Accordion title="Resource Limits">
+    Control memory allocation:
+    ```yaml
+    environment:
+      MEMORY: "4G"          # Initial and max memory
+      MAX_MEMORY: "8G"      # Maximum JVM heap
+      INIT_MEMORY: "2G"     # Initial JVM heap
+    ```
+    
+    <Warning>
+      Ensure your host has sufficient RAM. Java will allocate the specified amount plus additional overhead.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Restart Policies">
+    Available restart policies:
+    
+    - `no` - Never restart automatically
+    - `on-failure` - Restart only on error
+    - `always` - Always restart regardless of stop reason
+    - `unless-stopped` - Restart unless explicitly stopped (recommended)
+    
+    ```yaml
+    restart: unless-stopped
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Environment-Specific Configurations
+
+### Development
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+      - ./mods:/mods        # Mount local mods directory
+      - ./plugins:/plugins  # Mount local plugins directory
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "LATEST"
+      MEMORY: "2G"
+```
+
+<Note>
+  Bind mounts allow you to edit files locally and see changes immediately.
+</Note>
+
+### Production
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server:java21
+    container_name: mc-prod
+    ports:
+      - "25565:25565"
+    volumes:
+      - mc-data:/data
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.4"
+      MEMORY: "8G"
+      ENABLE_ROLLING_LOGS: "TRUE"
+      TZ: "America/New_York"
+      DIFFICULTY: "normal"
+      MAX_PLAYERS: 50
+      VIEW_DISTANCE: 10
+      SIMULATION_DISTANCE: 8
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+volumes:
+  mc-data:
+    driver: local
+```
+
+<Warning>
+  Always pin specific versions in production to prevent unexpected updates.
+</Warning>
+
+## Advanced Deployment Patterns
+
+### Auto-pause
+
+Reduce resource usage when no players are online:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc:/data"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      ENABLE_AUTOPAUSE: "TRUE"
+      MAX_TICK_TIME: "-1"
+      AUTOPAUSE_TIMEOUT_INIT: "30"
+      AUTOPAUSE_TIMEOUT_EST: "10"
+      JVM_DD_OPTS: "disable.watchdog:true"
+    restart: unless-stopped
+
+volumes:
+  mc: {}
+```
+
+<Note>
+  See the [full autopause example](https://github.com/itzg/docker-minecraft-server/tree/master/examples/autopause) for detailed configuration.
+</Note>
+
+### With Proxy
+
+Route traffic through a proxy server:
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      PROXY: proxy:3128
+      
+  proxy:
+    image: sameersbn/squid
+```
+
+### Multiple Mounts
+
+Mount specific directories for better organization:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    volumes:
+      - ./data:/data
+      - ./mods:/mods
+      - ./config:/config
+      - ./plugins:/plugins
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      TYPE: "FORGE"
+      VERSION: "1.19.2"
+    tty: true
+    stdin_open: true
+```
+
+## Deployment Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Named Volumes" icon="database">
+    Named volumes are managed by Docker and persist across container recreations
+  </Card>
+  
+  <Card title="Pin Versions" icon="thumbtack">
+    Specify exact versions in production to prevent breaking changes
+  </Card>
+  
+  <Card title="Configure Backups" icon="clock">
+    Implement regular backup strategies for world data
+  </Card>
+  
+  <Card title="Monitor Resources" icon="gauge">
+    Track CPU, memory, and disk usage to prevent performance issues
+  </Card>
+  
+  <Card title="Set Restart Policies" icon="rotate">
+    Use `unless-stopped` for automatic recovery from failures
+  </Card>
+  
+  <Card title="Use Health Checks" icon="heart-pulse">
+    Implement health checks to detect server issues
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Kubernetes Deployment" icon="dharmachakra" href="/deployment/kubernetes">
+    Deploy on Kubernetes with StatefulSets and Helm charts
+  </Card>
+  
+  <Card title="Docker Swarm" icon="layer-group" href="/deployment/docker-swarm">
+    Set up clustered deployments with Docker Swarm
+  </Card>
+  
+  <Card title="More Examples" icon="code" href="/deployment/examples">
+    Explore additional deployment configurations and patterns
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Official Examples Repository](https://github.com/itzg/docker-minecraft-server/tree/master/examples)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Zero to Minecraft Server Guide](https://dev.to/rela-v/zero-to-minecraft-server-with-docker-desktop-and-compose-500a)

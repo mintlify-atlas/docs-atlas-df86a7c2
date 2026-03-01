@@ -1,0 +1,275 @@
+---
+title: Building Custom Images
+description: Build custom Docker images with alternate Java versions or additional packages
+---
+
+<Warning>
+This page describes advanced functionality for rare use cases. Most users should use the pre-built images from Docker Hub.
+</Warning>
+
+Build custom images when you need:
+- A specific Java base image not provided by default
+- Additional system packages
+- Custom modifications for specific requirements
+
+<Note>
+Before building a custom image, confirm that the desired [Java version and variant](../versions/java-versions) isn't already provided.
+</Note>
+
+## Building with Alternate Java Base
+
+You can specify an alternate Java base image using the `BASE_IMAGE` build argument.
+
+### Example: GraalVM Base Image
+
+```bash
+docker build \
+  --build-arg BASE_IMAGE=ghcr.io/graalvm/graalvm-ce:ol8-java11 \
+  -t myregistry/minecraft-server:java11-graalvm \
+  .
+```
+
+This builds an image using GraalVM Community Edition with Java 11 on Oracle Linux 8.
+
+### Example: Custom OpenJDK Build
+
+```bash
+docker build \
+  --build-arg BASE_IMAGE=eclipse-temurin:21-jdk-jammy \
+  -t myregistry/minecraft-server:java21-custom \
+  .
+```
+
+## Building Multi-Architecture Images
+
+Create images that support multiple CPU architectures (amd64, arm64, armv7).
+
+<Note>
+This requires Docker BuildKit/buildx support to be enabled.
+</Note>
+
+### Build and Push Multi-Architecture
+
+```bash
+docker buildx build \
+  --platform=linux/arm64,linux/arm/v7,linux/amd64 \
+  --tag myregistry/minecraft-server:latest \
+  --push \
+  .
+```
+
+This command:
+1. Builds for three architectures simultaneously
+2. Creates a multi-arch manifest
+3. Pushes to your registry
+
+### Build for Local Use
+
+Multi-architecture images cannot be loaded directly into the local Docker daemon. Use one of these approaches:
+
+**Option 1: Use buildx with load (single architecture)**
+```bash
+docker buildx build \
+  --tag myregistry/minecraft-server:latest \
+  --load \
+  .
+```
+
+**Option 2: Traditional build (single architecture)**
+```bash
+docker build -t myregistry/minecraft-server:latest .
+```
+
+## Installing Extra Packages
+
+Add additional packages to the image using distribution-specific build arguments.
+
+### Debian/Ubuntu Based Images
+
+Use `EXTRA_DEB_PACKAGES` for apt-based distributions:
+
+```bash
+docker build \
+  --build-arg EXTRA_DEB_PACKAGES="python3 python3-pip curl jq" \
+  -t myregistry/minecraft-server:with-python \
+  .
+```
+
+### Red Hat/Fedora Based Images
+
+Use `EXTRA_DNF_PACKAGES` for dnf/yum-based distributions:
+
+```bash
+docker build \
+  --build-arg BASE_IMAGE=registry.access.redhat.com/ubi9/openjdk-21:latest \
+  --build-arg EXTRA_DNF_PACKAGES="python3 python3-pip" \
+  -t myregistry/minecraft-server:rhel-python \
+  .
+```
+
+### Alpine Based Images
+
+Use `EXTRA_ALPINE_PACKAGES` for apk-based distributions:
+
+```bash
+docker build \
+  --build-arg BASE_IMAGE=eclipse-temurin:21-jdk-alpine \
+  --build-arg EXTRA_ALPINE_PACKAGES="python3 py3-pip bash" \
+  -t myregistry/minecraft-server:alpine-python \
+  .
+```
+
+## Complete Build Examples
+
+### Minimal Custom Build
+
+```bash
+# Clone the repository
+git clone https://github.com/itzg/docker-minecraft-server.git
+cd docker-minecraft-server
+
+# Build with custom tag
+docker build -t myregistry/minecraft-server:latest .
+```
+
+### Custom Base with Extra Packages
+
+```bash
+docker build \
+  --build-arg BASE_IMAGE=eclipse-temurin:21-jdk-jammy \
+  --build-arg EXTRA_DEB_PACKAGES="htop vim curl wget" \
+  -t myregistry/minecraft-server:tools \
+  .
+```
+
+### Multi-Arch Production Build
+
+```bash
+# Initialize buildx (if not already done)
+docker buildx create --use --name minecraft-builder
+
+# Build and push multi-arch image
+docker buildx build \
+  --platform=linux/amd64,linux/arm64,linux/arm/v7 \
+  --build-arg BASE_IMAGE=eclipse-temurin:21-jdk \
+  --tag myregistry/minecraft-server:latest \
+  --tag myregistry/minecraft-server:1.0.0 \
+  --push \
+  .
+```
+
+## Build Arguments Reference
+
+| Build Argument | Description | Example |
+|----------------|-------------|----------|
+| `BASE_IMAGE` | Java base image to use | `eclipse-temurin:21-jdk` |
+| `EXTRA_DEB_PACKAGES` | Packages for Debian/Ubuntu | `"curl jq python3"` |
+| `EXTRA_DNF_PACKAGES` | Packages for RHEL/Fedora | `"curl jq python3"` |
+| `EXTRA_ALPINE_PACKAGES` | Packages for Alpine | `"curl jq python3"` |
+| `GITHUB_BASEURL` | Override GitHub API URL (for development) | `http://host.docker.internal:8080` |
+| `APPS_REV` | Force refresh of downloaded apps | `1`, `2`, etc. |
+| `MC_HELPER_VERSION` | Override mc-image-helper version | `1.8.1-SNAPSHOT` |
+
+## Using Your Custom Image
+
+Once built, use your custom image like any other:
+
+```yaml
+services:
+  mc:
+    image: myregistry/minecraft-server:latest
+    environment:
+      EULA: "true"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+## Development Builds
+
+For development and testing, see the [Contributing Guide](./contributing) which covers:
+- Iterative script development
+- Using development copies of bundled tools
+- Testing changes without rebuilding
+- Local documentation preview
+
+## Best Practices
+
+<Steps>
+  <Step title="Use specific base image tags">
+    Avoid `latest` tags for reproducible builds:
+    
+    ```bash
+    # Good
+    --build-arg BASE_IMAGE=eclipse-temurin:21.0.1_12-jdk-jammy
+    
+    # Avoid in production
+    --build-arg BASE_IMAGE=eclipse-temurin:latest
+    ```
+  </Step>
+  
+  <Step title="Tag your images appropriately">
+    Use semantic versioning or descriptive tags:
+    
+    ```bash
+    -t myregistry/minecraft-server:1.2.3
+    -t myregistry/minecraft-server:java21-graalvm
+    ```
+  </Step>
+  
+  <Step title="Test before deploying">
+    Always test custom builds before production use:
+    
+    ```bash
+    docker run --rm -it \
+      -e EULA=true \
+      -e SETUP_ONLY=true \
+      myregistry/minecraft-server:latest
+    ```
+  </Step>
+  
+  <Step title="Document customizations">
+    Keep notes on why and how you built custom images for future reference.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Build fails with 'failed to solve' error">
+Ensure Docker BuildKit is enabled:
+
+```bash
+export DOCKER_BUILDKIT=1
+```
+
+Or use buildx:
+
+```bash
+docker buildx build ...
+```
+</Accordion>
+
+<Accordion title="Multi-arch build is slow">
+Multi-architecture builds can be time-consuming because they may require QEMU emulation.
+
+Consider:
+- Building only needed architectures
+- Using native builders for each architecture
+- Leveraging build cache
+</Accordion>
+
+<Accordion title="Package installation fails">
+Ensure you're using the correct build argument for your base image's package manager:
+
+- Debian/Ubuntu: `EXTRA_DEB_PACKAGES`
+- RHEL/Fedora: `EXTRA_DNF_PACKAGES`
+- Alpine: `EXTRA_ALPINE_PACKAGES`
+</Accordion>
+
+## Additional Resources
+
+- [Docker Build Reference](https://docs.docker.com/reference/cli/docker/buildx/build/)
+- [Docker Buildx Documentation](https://docs.docker.com/buildx/working-with-buildx/)
+- [Multi-platform Images Guide](https://docs.docker.com/build/building/multi-platform/)
+- [Contributing Guide](./contributing) for development workflows

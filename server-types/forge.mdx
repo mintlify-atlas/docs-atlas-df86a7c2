@@ -1,0 +1,523 @@
+---
+title: Forge Server
+description: Traditional modding platform with extensive mod ecosystem for Minecraft servers
+---
+
+Forge is the most established modding platform for Minecraft, offering a comprehensive API and the largest collection of mods. It's the go-to choice for running traditional modded Minecraft servers.
+
+## Overview
+
+Minecraft Forge provides:
+
+- **Extensive Mod Library**: Thousands of mods available
+- **Mature Platform**: Long-standing, stable modding framework
+- **Wide Version Support**: Available for most Minecraft versions
+- **Complex Mods**: Supports large-scale gameplay modifications
+- **Active Community**: Large modding community and resources
+
+<Note>
+  Please support the Forge project through [Patreon](https://www.patreon.com/LexManos/) if you automate downloads, as their development is supported by ads from their download page.
+</Note>
+
+## Configuration
+
+### Basic Setup
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FORGE
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-forge \
+  -e EULA=TRUE \
+  -e TYPE=FORGE \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+## Version Selection
+
+### Automatic Recommended Version
+
+By default, the recommended Forge version for your Minecraft version is selected:
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.20.4"  # Uses recommended Forge for 1.20.4
+```
+
+### Latest Forge Version
+
+Use the latest Forge build instead of recommended:
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.20.4"
+  FORGE_VERSION: latest
+```
+
+### Specific Forge Version
+
+Select a specific Forge version:
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.12.2"
+  FORGE_VERSION: "14.23.5.2854"
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `FORGE` |
+| `VERSION` | latest | Minecraft version (e.g., `1.20.4`) |
+| `FORGE_VERSION` | recommended | Forge version: `recommended`, `latest`, or specific version |
+| `FORGE_INSTALLER` | - | Path to pre-downloaded Forge installer |
+| `FORGE_INSTALLER_URL` | - | URL to download Forge installer |
+| `FORGE_FORCE_REINSTALL` | `false` | Force reinstall Forge |
+| `FORGE_PROMOTIONS_URL` | [official] | Custom promotions JSON URL |
+| `FORGE_MAVEN_REPO_URL` | [official] | Custom Maven repository URL |
+
+## Custom Forge Installer
+
+### Pre-Downloaded Installer
+
+Use a pre-downloaded Forge installer:
+
+```yaml
+environment:
+  TYPE: FORGE
+  FORGE_INSTALLER: "/data/forge-installer.jar"
+volumes:
+  - ./data:/data
+  - ./forge-installer.jar:/data/forge-installer.jar
+```
+
+<Note>
+  When using `FORGE_INSTALLER`, you don't need to specify `VERSION` or `FORGE_VERSION`.
+</Note>
+
+### Custom Download URL
+
+Download Forge installer from a custom location:
+
+```yaml
+environment:
+  TYPE: FORGE
+  FORGE_INSTALLER_URL: "https://your-repo.com/forge-installer.jar"
+```
+
+## Mod Management
+
+### Manual Mod Installation
+
+<Steps>
+  <Step title="Mount mods directory">
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+    ```
+  </Step>
+  
+  <Step title="Download Forge mods">
+    Download Forge mods (`.jar` files) from [CurseForge](https://www.curseforge.com/minecraft/mc-mods) or [Modrinth](https://modrinth.com).
+  </Step>
+  
+  <Step title="Add to mods directory">
+    Place mod files in `./mods/` on your host.
+  </Step>
+  
+  <Step title="Restart server">
+    ```bash
+    docker restart minecraft-forge
+    ```
+  </Step>
+</Steps>
+
+### Auto-Download from CurseForge
+
+Automatically install mods from CurseForge:
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.20.1"
+  CF_API_KEY: "your-curseforge-api-key"
+  CF_SLUG: "jei,journeymap,iron-chests"
+```
+
+### Auto-Download from Modrinth
+
+Install Forge-compatible mods from Modrinth:
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.20.1"
+  MODRINTH_PROJECTS: |
+    jei
+    journeymap
+```
+
+<Warning>
+  Forge mods are NOT compatible with Fabric mods. Ensure all mods are built for Forge and your Minecraft version.
+</Warning>
+
+## Forge Modpacks
+
+### CurseForge Modpacks
+
+Automatically install complete CurseForge modpacks:
+
+```yaml
+environment:
+  TYPE: FORGE
+  CF_API_KEY: "your-api-key"
+  CF_PAGE_URL: "https://www.curseforge.com/minecraft/modpacks/all-the-mods-9"
+```
+
+Or use the modpack file:
+
+```yaml
+environment:
+  TYPE: FORGE
+  CF_API_KEY: "your-api-key"
+  MODPACK: "/data/modpack.zip"
+```
+
+### Modrinth Modpacks
+
+```yaml
+environment:
+  TYPE: FORGE  # Will be auto-detected from modpack
+  MODRINTH_MODPACK: "https://modrinth.com/modpack/atm9"
+```
+
+## Popular Forge Mods
+
+### Performance Optimization
+
+```yaml
+environment:
+  TYPE: FORGE
+  VERSION: "1.20.1"
+  MODRINTH_PROJECTS: |
+    modernfix
+    ferritecore
+    lazy-dfu
+```
+
+### Essential Utilities
+
+```yaml
+environment:
+  CF_SLUG: |
+    jei
+    journey-map
+    ftb-utilities
+    ftb-chunks
+```
+
+### Tech Mods
+
+```yaml
+environment:
+  CF_SLUG: |
+    applied-energistics-2
+    thermal-expansion
+    mekanism
+    industrial-foregoing
+```
+
+## NeoForge
+
+NeoForge is a modern fork of Forge for newer Minecraft versions:
+
+```yaml
+environment:
+  TYPE: NEOFORGE
+  VERSION: "1.20.4"
+  NEOFORGE_VERSION: "47.1.79"  # Or "latest" or "beta"
+```
+
+<CodeGroup>
+```yaml Latest NeoForge
+environment:
+  TYPE: NEOFORGE
+  VERSION: "1.20.4"
+  NEOFORGE_VERSION: latest
+```
+
+```yaml Beta Channel
+environment:
+  TYPE: NEOFORGE
+  VERSION: "1.20.4"
+  NEOFORGE_VERSION: beta
+```
+
+```yaml Specific Version
+environment:
+  TYPE: NEOFORGE
+  VERSION: "1.20.1"
+  NEOFORGE_VERSION: "47.1.79"
+```
+</CodeGroup>
+
+## Cleanroom (Legacy)
+
+For legacy modded servers, Cleanroom can be used:
+
+<Steps>
+  <Step title="Find Cleanroom release">
+    Visit [Cleanroom releases](https://github.com/CleanroomMC/Cleanroom/releases)
+  </Step>
+  
+  <Step title="Copy installer URL">
+    Get the link to the `*-installer.jar` file
+  </Step>
+  
+  <Step title="Configure server">
+    ```yaml
+    environment:
+      TYPE: FORGE
+      FORGE_INSTALLER_URL: "https://github.com/CleanroomMC/Cleanroom/releases/download/0.2.4-alpha/cleanroom-0.2.4-alpha-installer.jar"
+    ```
+  </Step>
+</Steps>
+
+## Complete Production Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-forge
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: FORGE
+      VERSION: "1.20.1"
+      FORGE_VERSION: "recommended"
+      
+      # Modpack (optional)
+      # CF_API_KEY: "your-api-key"
+      # CF_PAGE_URL: "https://www.curseforge.com/minecraft/modpacks/your-pack"
+      
+      # Individual Mods (optional)
+      MODRINTH_PROJECTS: |
+        jei
+        journeymap
+        modernfix
+        ferritecore
+      
+      # Server Settings
+      MOTD: "A Forge Minecraft Server"
+      DIFFICULTY: normal
+      MODE: survival
+      MAX_PLAYERS: 30
+      VIEW_DISTANCE: 10
+      
+      # Performance
+      MEMORY: 8G
+      USE_AIKAR_FLAGS: "true"
+      
+      # World
+      LEVEL: "world"
+      SEED: "forge-world"
+      
+      # Security
+      ENABLE_WHITELIST: "false"
+      ONLINE_MODE: "true"
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./config:/data/config
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Mod Configuration
+
+### Config Files
+
+Forge mods store configuration in the `config` directory:
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./config:/data/config
+```
+
+Typical config structure:
+- `./config/mod-name.toml`
+- `./config/mod-name/settings.cfg`
+- `./config/mod-name/client.cfg`
+- `./config/mod-name/server.cfg`
+
+### Server vs Client Configs
+
+**Server-Side Mods**:
+- Only needed on server
+- Players can connect without them
+- Examples: server utilities, admin tools
+
+**Client-Side Mods**:
+- Only affect client rendering/UI
+- Not needed on server
+- Examples: minimaps, inventory sorters
+
+**Universal Mods**:
+- Required on both client and server
+- Most gameplay mods
+- Examples: tech mods, content mods
+
+## Performance Tuning
+
+### Memory Recommendations
+
+| Mod Count | Players | Recommended RAM |
+|-----------|---------|----------------|
+| < 50 | 1-10 | 4-6GB |
+| 50-100 | 10-20 | 6-8GB |
+| 100-200 | 20-30 | 8-12GB |
+| 200+ | 30+ | 12GB+ |
+
+### JVM Flags
+
+```yaml
+environment:
+  MEMORY: 8G
+  USE_AIKAR_FLAGS: "true"
+  JVM_OPTS: "-XX:+UseG1GC -XX:+ParallelRefProcEnabled"
+```
+
+### Optimization Mods
+
+Install these for better performance:
+
+```yaml
+environment:
+  MODRINTH_PROJECTS: |
+    modernfix      # Overall performance
+    ferritecore    # Memory optimization
+    lazy-dfu       # Startup performance
+    roadrunner     # Performance improvements
+```
+
+## Troubleshooting
+
+### Installation Failed
+
+If Forge installation fails:
+
+```yaml
+environment:
+  FORGE_FORCE_REINSTALL: "true"
+```
+
+<Warning>
+  Remove `FORGE_FORCE_REINSTALL` after successful installation.
+</Warning>
+
+### Mod Conflicts
+
+1. Check server logs for error messages
+2. Verify all mods support the same Minecraft version
+3. Check for known incompatibilities
+4. Remove mods one by one to isolate the issue
+
+### Memory Issues
+
+1. Increase allocated memory
+2. Install optimization mods
+3. Reduce render distance
+4. Remove resource-intensive mods
+
+### Version Compatibility
+
+Ensure:
+- Minecraft version matches Forge version
+- All mods support your Forge version
+- Mod dependencies are installed
+
+## Migration Guide
+
+### From Vanilla to Forge
+
+<Steps>
+  <Step title="Backup your world">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Update configuration">
+    ```yaml
+    environment:
+      TYPE: FORGE
+      VERSION: "1.20.1"
+      FORGE_VERSION: recommended
+    ```
+  </Step>
+  
+  <Step title="Add mods">
+    Place mod files in `./mods/` directory.
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Players must install Forge and all required mods on their clients to connect.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CurseForge Modpacks" icon="fire" href="/mods-and-plugins/curseforge">
+    Install complete modpacks from CurseForge
+  </Card>
+  <Card title="Modrinth Integration" icon="download" href="/mods-and-plugins/modrinth">
+    Download mods from Modrinth
+  </Card>
+  <Card title="NeoForge" icon="hammer" href="#neoforge">
+    Try modern NeoForge fork
+  </Card>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Run Forge mods with plugins
+  </Card>
+</CardGroup>

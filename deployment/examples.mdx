@@ -1,0 +1,697 @@
+---
+title: Deployment Examples
+description: Real-world deployment configurations and patterns for various use cases
+---
+
+This page provides practical deployment examples for common scenarios using the Docker Minecraft Server. All examples are based on real configurations from the [official examples repository](https://github.com/itzg/docker-minecraft-server/tree/master/examples).
+
+## Basic Deployments
+
+### Vanilla Server
+
+The simplest possible deployment:
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+    volumes:
+      - ./data:/data
+```
+
+<Steps>
+  <Step title="Create the file">
+    Save as `docker-compose.yml`
+  </Step>
+  
+  <Step title="Start the server">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Check logs">
+    ```bash
+    docker compose logs -f
+    ```
+  </Step>
+</Steps>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-simple.yml)
+
+### Paper Server
+
+Optimized server with Paper:
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    environment:
+      EULA: "true"
+      TYPE: PAPER
+      MEMORY: 2G
+    ports:
+      - "25565:25565"
+    volumes:
+      - mc-data:/data
+    restart: unless-stopped
+    
+volumes:
+  mc-data: {}
+```
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/paper/compose.yml)
+
+## Advanced Features
+
+### Server with Auto-pause
+
+Automatically pause when no players are online:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc:/data"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      ENABLE_AUTOPAUSE: "TRUE"
+      MAX_TICK_TIME: "-1"
+      # More aggressive settings for demo purposes
+      AUTOPAUSE_TIMEOUT_INIT: "30"
+      AUTOPAUSE_TIMEOUT_EST: "10"
+      JVM_DD_OPTS: "disable.watchdog:true"
+    restart: unless-stopped
+
+volumes:
+  mc: {}
+```
+
+<Note>
+  Auto-pause reduces CPU usage when the server is idle, perfect for servers with intermittent usage.
+</Note>
+
+**Configuration:**
+- `AUTOPAUSE_TIMEOUT_INIT`: Seconds before initial pause (default: 600)
+- `AUTOPAUSE_TIMEOUT_EST`: Seconds to wait for player join estimation (default: 3600)
+- `MAX_TICK_TIME`: Set to `-1` to disable watchdog during pause
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/autopause/compose.yml)
+
+### Server with Auto-stop
+
+Automatically stop container when empty:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc:/data"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      ENABLE_AUTOSTOP: "TRUE"
+      AUTOSTOP_TIMEOUT_INIT: 1800
+      AUTOSTOP_TIMEOUT_EST: 900
+    restart: unless-stopped
+
+volumes:
+  mc: {}
+```
+
+<Warning>
+  Auto-stop will stop the container completely. Use with orchestration that can restart on-demand.
+</Warning>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/autostop/compose.yml)
+
+## RCON Integration
+
+### Server with RCON Commands
+
+Automate server commands at various lifecycle events:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: ${IMAGE_TO_TEST:-itzg/minecraft-server}
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mc:/data"
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      MEMORY: "2G"
+      CURSEFORGE_FILES: |
+        fabric-api
+        chunky-pregenerator
+      CF_API_KEY: ${CF_API_KEY}
+      # Commands to run on server startup
+      RCON_CMDS_STARTUP:  |-
+        /gamerule doFireTick false
+        /team add New
+        /team add Old
+        /chunky radius 1000
+        /chunky start
+      # Commands when player connects
+      RCON_CMDS_ON_CONNECT: |-
+        /team join New @a[team=]
+        /give @a[team=New] birch_boat
+        /team join Old @a[team=New]
+      # Commands on first player connect
+      RCON_CMDS_FIRST_CONNECT: |-
+        /chunky pause
+      # Commands when last player disconnects
+      RCON_CMDS_LAST_DISCONNECT: |-
+        /kill @e[type=minecraft:boat]
+        /chunky continue
+    restart: unless-stopped
+    
+volumes:
+  mc: {}
+```
+
+<AccordionGroup>
+  <Accordion title="Available RCON Command Types">
+    - `RCON_CMDS_STARTUP`: Run once after server starts
+    - `RCON_CMDS_ON_CONNECT`: Run when any player connects
+    - `RCON_CMDS_FIRST_CONNECT`: Run when first player connects
+    - `RCON_CMDS_ON_DISCONNECT`: Run when any player disconnects
+    - `RCON_CMDS_LAST_DISCONNECT`: Run when last player disconnects
+  </Accordion>
+</AccordionGroup>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-rconcmd.yml)
+
+## Modded Servers
+
+### Forge Server with Mods
+
+Mount a local mods directory:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    volumes:
+      - ./data:/data
+      - ./mods:/mods
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      TYPE: "FORGE"
+      VERSION: "1.19.2"
+    tty: true
+    stdin_open: true
+```
+
+<Note>
+  Place your mod `.jar` files in the `./mods` directory before starting.
+</Note>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-mods-mount.yml)
+
+### CurseForge Modpack (ATM7)
+
+Deploy a complete CurseForge modpack:
+
+<CodeGroup>
+```yaml docker-compose.yml
+services:
+  mc_atm7:
+    image: itzg/minecraft-server
+    container_name: mc_atm7
+    ports:
+      - 25565:25565
+    restart: unless-stopped
+    volumes:
+      - ./modpacks:/modpacks:ro
+      - data:/data
+    environment:
+      EULA: "true"
+      TYPE: CURSEFORGE
+      CF_SERVER_MOD: /modpacks/ATM7-0.4.32-server.zip
+      MEMORY: "8G"
+      TZ: "America/New_York"
+      OVERRIDE_SERVER_PROPERTIES: "true"
+      DIFFICULTY: "easy"
+      MAX_TICK_TIME: "-1"
+      ALLOW_FLIGHT: "true"
+      VIEW_DISTANCE: 10
+      MAX_PLAYERS: 10
+      PVP: "false"
+      LEVEL_TYPE: "biomesoplenty"
+      MOTD: "Welcome Home"
+
+volumes:
+  data:
+```
+
+```bash setup.sh
+#!/bin/bash
+# Create modpacks directory
+mkdir -p modpacks
+
+# Download your modpack server files
+# Place ATM7-0.4.32-server.zip in modpacks/
+
+# Start the server
+docker compose up -d
+```
+</CodeGroup>
+
+<Steps>
+  <Step title="Download modpack">
+    Download the server files from CurseForge
+  </Step>
+  
+  <Step title="Place in directory">
+    Put the zip file in `./modpacks/`
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+</Steps>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-curseforge-atm7.yaml)
+
+## Auto-scaling and On-Demand
+
+### Lazymc Integration
+
+Start server on-demand when players connect:
+
+```yaml docker-compose.yml
+networks:
+  minecraft-network:
+    driver: bridge    
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+
+services:
+  lazymc:
+    image: ghcr.io/joesturge/lazymc-docker-proxy:latest
+    networks:
+      minecraft-network:
+        ipv4_address: 172.18.0.2
+    restart: unless-stopped
+    volumes:
+      - data:/server:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "25565:25565"
+
+  mc:
+    image: itzg/minecraft-server:java21
+    networks:
+      minecraft-network:
+        ipv4_address: 172.18.0.3
+    labels:
+      - lazymc.enabled=true
+      - lazymc.group=mc
+      - lazymc.server.address=mc:25565
+    tty: true
+    stdin_open: true
+    restart: no
+    environment:
+      EULA: "TRUE"
+    volumes:
+      - data:/data
+
+volumes:
+  data:
+```
+
+<Note>
+  Lazymc requires static IPs and Docker socket access to manage the server container.
+</Note>
+
+**How it works:**
+1. Lazymc proxy listens on port 25565
+2. When a player connects, it starts the Minecraft container
+3. Traffic is forwarded to the actual server
+4. Server stops after configured idle timeout
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/lazymc/docker_compose.yml)
+
+### MC-Router Auto-scale
+
+Route multiple servers with auto-scaling:
+
+```yaml docker-compose.yml
+services:
+  router:
+    image: itzg/mc-router
+    environment:
+      IN_DOCKER: true
+      # Global auto-scaling settings
+      AUTO_SCALE_DOWN: true
+      AUTO_SCALE_UP: true
+      AUTO_SCALE_DOWN_AFTER: 2h
+      AUTO_SCALE_ASLEEP_MOTD: "Server is asleep. Join again to wake it up!"
+    ports:
+      - "25565:25565"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+  vanilla:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+    labels:
+      mc-router.host: "vanilla.example.com"
+      
+  fabric:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+    labels:
+      mc-router.host: "fabric.example.com"
+      mc-router.auto-scale-up: false
+      mc-router.auto-scale-down: false
+      
+  paper:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+    labels:
+      mc-router.host: "paper.example.com"
+      mc-router.auto-scale-asleep-motd: "Paper is folded. Join to unfold!"
+```
+
+<AccordionGroup>
+  <Accordion title="Router Configuration">
+    **Environment Variables:**
+    - `IN_DOCKER`: Enable Docker backend
+    - `AUTO_SCALE_DOWN`: Enable auto-scaling down
+    - `AUTO_SCALE_UP`: Enable auto-scaling up
+    - `AUTO_SCALE_DOWN_AFTER`: Idle time before scaling down
+    
+    **Label Overrides:**
+    - `mc-router.host`: Server hostname for routing
+    - `mc-router.auto-scale-up`: Override global setting
+    - `mc-router.auto-scale-down`: Override global setting
+    - `mc-router.auto-scale-asleep-motd`: Custom sleep message
+  </Accordion>
+</AccordionGroup>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/mc-router-autoscale/compose.yml)
+
+## Proxy Configurations
+
+### HTTP Proxy
+
+Route server traffic through a proxy:
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      PROXY: proxy:3128
+      
+  proxy:
+    image: sameersbn/squid
+```
+
+<Note>
+  Useful for controlling outbound connections or caching downloads.
+</Note>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/proxied/compose.yml)
+
+## Multi-Service Setups
+
+### Production Server with RCON Web Admin
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    volumes:
+      - "mcbig:/data"
+    environment:
+      EULA: "TRUE"
+      MAX_MEMORY: 32G
+      MAX_BUILD_HEIGHT: 256
+      VIEW_DISTANCE: 15
+      LEVEL_TYPE: LARGEBIOMES
+      MAX_PLAYERS: 100
+      CONSOLE: "false"
+    restart: always
+    
+  rcon:
+    image: itzg/rcon
+    ports:
+      - "4326:4326"
+      - "4327:4327"
+    volumes:
+      - "rcon:/opt/rcon-web-admin/db"
+
+volumes:
+  mcbig:
+  rcon:
+```
+
+**Access RCON:**
+- Web interface: http://localhost:4326
+- Websocket: ws://localhost:4327
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/docker-compose-big.yml)
+
+## Configuration Management
+
+### Apply Extra Configs
+
+Automatically copy configuration files:
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      # Copy configs from /extras to /data
+      COPY_CONFIG_DEST: /data
+    volumes:
+      - ./data:/data
+      - ./shared-configs:/extras:ro
+    ports:
+      - "25565:25565"
+```
+
+**Directory structure:**
+```
+.
+├── docker-compose.yml
+├── data/                    # Server data
+└── shared-configs/          # Mounted as /extras
+    ├── LuckPerms/
+    │   └── config.yml
+    └── plugins/
+        └── plugin.yml
+```
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/apply-extra-configs/compose.yml)
+
+## Special Server Types
+
+### BentoBox (Skyblock)
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: SPIGOT
+      SPIGET_RESOURCES: "88802"  # BentoBox plugin ID
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/bentobox/compose.yml)
+
+### Geyser (Bedrock Bridge)
+
+```yaml docker-compose.yml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      PLUGINS: |
+        https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot
+        https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot
+    ports:
+      - "25565:25565"   # Java
+      - "19132:19132/udp" # Bedrock
+    volumes:
+      - ./data:/data
+```
+
+<Note>
+  This allows Bedrock Edition clients to connect to your Java server.
+</Note>
+
+[View on GitHub](https://github.com/itzg/docker-minecraft-server/blob/master/examples/geyser)
+
+## Volume Mount Patterns
+
+### Complete Directory Mapping
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    volumes:
+      # Data directory
+      - ./data:/data
+      # Specific subdirectories
+      - ./worlds:/data/worlds
+      - ./plugins:/plugins
+      - ./mods:/mods
+      - ./config:/config
+      # Backups
+      - ./backups:/backups
+      # Read-only resources
+      - ./resource-packs:/data/resource-packs:ro
+```
+
+### Named Volumes for Production
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    volumes:
+      - mc-data:/data
+      - mc-backups:/backups
+      - mc-logs:/data/logs
+
+volumes:
+  mc-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/storage/minecraft/data
+  mc-backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/storage/minecraft/backups
+  mc-logs:
+    driver: local
+```
+
+## Resource Optimization
+
+### Low-Resource Server
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.4"
+      MEMORY: "1G"
+      VIEW_DISTANCE: 6
+      SIMULATION_DISTANCE: 4
+      MAX_PLAYERS: 10
+      ENABLE_AUTOPAUSE: "TRUE"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+### High-Performance Server
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server:java21
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.4"
+      MEMORY: "16G"
+      USE_AIKAR_FLAGS: "TRUE"
+      VIEW_DISTANCE: 12
+      SIMULATION_DISTANCE: 10
+      MAX_PLAYERS: 100
+      # Performance optimizations
+      SPIGET_RESOURCES: "34315"  # Spark profiler
+    ports:
+      - "25565:25565"
+    volumes:
+      - mc-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+        reservations:
+          cpus: '4'
+          memory: 16G
+
+volumes:
+  mc-data:
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="View All Examples" icon="github" href="https://github.com/itzg/docker-minecraft-server/tree/master/examples">
+    Browse the complete examples repository
+  </Card>
+  
+  <Card title="Kubernetes Deployment" icon="dharmachakra" href="/deployment/kubernetes">
+    Deploy on Kubernetes clusters
+  </Card>
+  
+  <Card title="Docker Swarm" icon="layer-group" href="/deployment/docker-swarm">
+    Set up Swarm deployments
+  </Card>
+  
+  <Card title="Configuration Reference" icon="book" href="/configuration/server-properties">
+    Explore all configuration options
+  </Card>
+</CardGroup>

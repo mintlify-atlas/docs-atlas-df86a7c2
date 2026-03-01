@@ -1,0 +1,312 @@
+---
+title: Variable Interpolation
+description: Replace variables in configuration files with environment variable values
+---
+
+Variable interpolation allows you to use runtime environment variables in your server configuration files, perfect for handling deployment-specific settings like database credentials or dynamic server names.
+
+## Overview
+
+When you have mods or plugins requiring configuration information only available at deploy-time (like database connections or runtime server names), you can use variable interpolation to inject environment variables into your configuration files.
+
+## Configuration File Interpolation
+
+### Basic Usage
+
+<ParamField path="REPLACE_ENV_IN_PLACE" type="boolean" default="true">
+  Replace variables in all files inside `/data` with matching environment variables
+</ParamField>
+
+<ParamField path="REPLACE_ENV_DURING_SYNC" type="boolean" default="false">
+  Replace variables in files synced from `/plugins`, `/mods`, and `/config` directories
+</ParamField>
+
+<ParamField path="REPLACE_ENV_VARIABLE_PREFIX" type="string" default="CFG_">
+  Prefix required for environment variables to be replaced. Set to empty string to allow any variable name.
+</ParamField>
+
+### Variable Syntax
+
+Variables use curly bracket syntax with a dollar sign prefix:
+
+```
+${CFG_YOUR_VARIABLE}
+```
+
+This is the same syntax used in many scripting languages and Docker Compose files.
+
+### Supported File Types
+
+Variable replacement works with these file extensions:
+- `.yml`
+- `.yaml`
+- `.txt`
+- `.cfg`
+- `.conf`
+- `.properties`
+
+### Example Configuration
+
+<Tabs>
+  <Tab title="Config File">
+    ```yaml database.yml
+    database:
+      host: ${CFG_DB_HOST}
+      name: ${CFG_DB_NAME}
+      password: ${CFG_DB_PASSWORD}
+    ```
+  </Tab>
+  <Tab title="docker compose">
+    ```yaml compose.yaml
+    services:
+      minecraft:
+        image: itzg/minecraft-server
+        environment:
+          EULA: "TRUE"
+          
+          # Enable variable replacement
+          REPLACE_ENV_VARIABLES: "TRUE"
+          
+          # Define prefix (optional, defaults to CFG_)
+          ENV_VARIABLE_PREFIX: "CFG_"
+          
+          # Your actual variables
+          CFG_DB_HOST: "http://localhost:3306"
+          CFG_DB_NAME: "minecraft"
+          CFG_DB_PASSWORD: "mypassword"
+          
+        volumes:
+          - "mc:/data"
+    
+    volumes:
+      mc:
+    ```
+  </Tab>
+</Tabs>
+
+## Using Secrets as Files
+
+For sensitive values like passwords, declare placeholders in config files and use environment variables with the `_FILE` suffix pointing to mounted secrets.
+
+<ParamField path="{VARIABLE_NAME}_FILE" type="string">
+  Environment variable pointing to a file containing the actual value. The variable name should match the placeholder but with `_FILE` suffix.
+</ParamField>
+
+### Example with Docker Secrets
+
+<CodeGroup>
+```toml my.cnf
+[client]
+password = ${CFG_DB_PASSWORD}
+```
+
+```yaml compose.yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      REPLACE_ENV_VARIABLES: "TRUE"
+      
+      # Point to the mounted secret file
+      CFG_DB_PASSWORD_FILE: /run/secrets/db_password
+      
+    volumes:
+      - mc:/data
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    external: true
+
+volumes:
+  mc:
+```
+</CodeGroup>
+
+## Exclusions
+
+### Exclude Specific Files
+
+<ParamField path="REPLACE_ENV_VARIABLES_EXCLUDES" type="string">
+  Comma or space-separated list of filenames (without path) to exclude from variable replacement
+</ParamField>
+
+```yaml
+environment:
+  REPLACE_ENV_VARIABLES_EXCLUDES: "protected.yml,sensitive.conf"
+```
+
+### Exclude Paths
+
+<ParamField path="REPLACE_ENV_VARIABLES_EXCLUDE_PATHS" type="string">
+  Space-separated list of paths to exclude from variable replacement. Exclusions are recursive.
+</ParamField>
+
+```yaml
+environment:
+  REPLACE_ENV_VARIABLES_EXCLUDE_PATHS: "/data/plugins/Essentials/userdata /data/plugins/MyPlugin"
+```
+
+## Server Properties Placeholders
+
+When declaring server properties via environment variables, you can use special placeholders that are processed when `server.properties` is updated.
+
+<Warning>
+  Placeholders in server properties use DOS-style `%VAR%` syntax to avoid being processed by Docker or the shell.
+</Warning>
+
+### Placeholder Types
+
+**Environment Variables:**
+- `%VAR%` - Replaced with value of environment variable VAR
+- `%env:VAR%` - Explicit environment variable syntax
+
+**Date Formatting:**
+- `%date:FMT%` - Formats current date/time using [Java's DateTimeFormatter](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/format/DateTimeFormatter.html)
+
+### Available Variables
+
+Any declared or resolved environment variable may be referenced:
+- `VERSION` - Resolved Minecraft version
+- `TYPE` - Server type
+- `DECLARED_VERSION` - Originally declared version (e.g., "LATEST" or "SNAPSHOT")
+- `MODPACK_NAME` - Available with Modrinth and Auto CurseForge modpacks
+- `MODPACK_VERSION` - Available with Modrinth and Auto CurseForge modpacks
+
+### Examples
+
+<CodeGroup>
+```yaml Simple Placeholder
+environment:
+  MOTD: Running %MODPACK_NAME% version %env:MODPACK_VERSION%
+```
+
+```yaml Date-Based World Name
+environment:
+  LEVEL: world-%date:yyyy-MM-dd%
+```
+
+```yaml Combined Example
+environment:
+  MOD_PLATFORM: AUTO_CURSEFORGE
+  CF_SLUG: craftoria
+  MOTD: |
+    A %TYPE% server on %VERSION%
+    running %MODPACK_NAME% %MODPACK_VERSION%
+  LEVEL: world-%date:yyyy-MM-dd%
+```
+</CodeGroup>
+
+<Note>
+  Placeholders are not supported when manually managing `server.properties` (when `OVERRIDE_SERVER_PROPERTIES=false`).
+</Note>
+
+## Patching Existing Files
+
+JSON path-based patches can be applied to existing files for more complex modifications.
+
+<ParamField path="PATCH_DEFINITIONS" type="string">
+  Path to a directory containing patch definition JSON files or a patch set JSON file. See [mc-image-helper documentation](https://github.com/itzg/mc-image-helper#patchdefinition) for format details.
+</ParamField>
+
+The `file` and `value` fields in patch definitions support `${...}` variable placeholders. Use `REPLACE_ENV_VARIABLE_PREFIX` to restrict allowed variables (defaults to "CFG_").
+
+### Patch Set Example
+
+```json patch-set.json
+{
+  "patches": [
+    {
+      "file": "/data/paper.yml",
+      "ops": [
+        {
+          "$set": {
+            "path": "$.verbose",
+            "value": true
+          }
+        },
+        {
+          "$set": {
+            "path": "$.settings['velocity-support'].enabled",
+            "value": "${CFG_VELOCITY_ENABLED}",
+            "value-type": "bool"
+          }
+        },
+        {
+          "$put": {
+            "path": "$.settings",
+            "key": "my-test-setting",
+            "value": "testing"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Supported Formats
+
+Patch definitions support:
+- JSON
+- JSON5
+- YAML
+- TOML (output is not pretty-printed)
+
+## Complete Example
+
+```yaml compose.yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.20.4"
+      
+      # Enable variable replacement
+      REPLACE_ENV_VARIABLES: "TRUE"
+      REPLACE_ENV_DURING_SYNC: "true"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      
+      # Database configuration
+      CFG_DB_HOST: "mysql.example.com"
+      CFG_DB_NAME: "minecraft"
+      CFG_DB_PASSWORD_FILE: "/run/secrets/db_password"
+      
+      # Server properties with placeholders
+      MOTD: |
+        Welcome to %TYPE% %VERSION%
+        Server started %date:yyyy-MM-dd%
+      
+      # Exclusions
+      REPLACE_ENV_VARIABLES_EXCLUDE_PATHS: "/data/plugins/Essentials/userdata"
+      
+    volumes:
+      - ./data:/data
+      - ./patches:/patches
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+## Best Practices
+
+<Note>
+  Use the `_FILE` suffix pattern with Docker Secrets for sensitive values like passwords and API keys.
+</Note>
+
+<Note>
+  Set `REPLACE_ENV_VARIABLE_PREFIX` to limit which environment variables can be replaced, preventing accidental substitution.
+</Note>
+
+<Warning>
+  Be careful with `REPLACE_ENV_VARIABLES_EXCLUDE_PATHS` - exclusions are recursive and will affect all files in the specified directories.
+</Warning>

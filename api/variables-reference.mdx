@@ -1,0 +1,391 @@
+---
+title: Environment Variables Reference
+description: Complete reference for all environment variables available in the Minecraft Docker server
+---
+
+This page provides a comprehensive reference for all environment variables supported by the itzg/minecraft-server Docker image.
+
+## General Configuration
+
+<ParamField path="UID" type="integer" default="1000">
+  The Linux user ID to run the server process as. Useful for matching file permissions with the host system.
+</ParamField>
+
+<ParamField path="GID" type="integer" default="1000">
+  The Linux group ID to run the server process as. Useful for matching file permissions with the host system.
+</ParamField>
+
+<ParamField path="TZ" type="string" default="UTC">
+  Configure the timezone for the container. Accepts standard timezone identifiers like `America/New_York` or `Europe/London`.
+  
+  Alternatively, you can mount `/etc/localtime:/etc/localtime:ro` and `/etc/timezone:/etc/timezone:ro`.
+</ParamField>
+
+<ParamField path="PROXY" type="string" default="">
+  Configure an HTTP/HTTPS proxy by passing the proxy's URL. Used for downloading server files and mods.
+</ParamField>
+
+## Memory Configuration
+
+<ParamField path="MEMORY" type="string" default="1G">
+  Sets both the initial and maximum Java heap size. Accepts values like `1G`, `2048M`, `4G`, etc.
+</ParamField>
+
+<ParamField path="INIT_MEMORY" type="string" default="1G">
+  Independently sets the initial heap size (-Xms). Overrides the value from `MEMORY`.
+</ParamField>
+
+<ParamField path="MAX_MEMORY" type="string" default="1G">
+  Independently sets the maximum heap size (-Xmx). Overrides the value from `MEMORY`.
+</ParamField>
+
+## Logging Configuration
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Root logger level. Available values: `trace`, `debug`, `info`, `warn`, `error`.
+</ParamField>
+
+<ParamField path="LOG_TIMESTAMP" type="boolean" default="false">
+  Include timestamps with each log entry when set to `true`.
+</ParamField>
+
+<ParamField path="LOG_CONSOLE_FORMAT" type="string" default="[%d{HH:mm:ss}] [%t/%level]: %msg%n">
+  Log4j2 pattern for console output (what you see in `docker logs`).
+</ParamField>
+
+<ParamField path="LOG_FILE_FORMAT" type="string" default="[%d{HH:mm:ss}] [%t/%level]: %msg%n">
+  Log4j2 pattern for file logs written to `logs/latest.log`.
+</ParamField>
+
+<ParamField path="LOG_TERMINAL_FORMAT" type="string" default="[%d{HH:mm:ss} %level]: %msg%n">
+  Log4j2 pattern for interactive terminal console used with `docker attach`.
+</ParamField>
+
+<ParamField path="ROLLING_LOG_FILE_PATTERN" type="string" default="logs/%d{yyyy-MM-dd}-%i.log.gz">
+  Pattern for rolled/archived log file names.
+</ParamField>
+
+<ParamField path="ROLLING_LOG_MAX_FILES" type="integer" default="1000">
+  Maximum number of archived log files to keep before deletion.
+</ParamField>
+
+<ParamField path="ENABLE_ROLLING_LOGS" type="boolean" default="false">
+  **Legacy option.** Rolling logs are now enabled by default via templated log4j2 configuration. Maintained for backward compatibility.
+</ParamField>
+
+## JVM Configuration
+
+<ParamField path="USE_AIKAR_FLAGS" type="boolean" default="false">
+  Enable [Aikar's optimized JVM flags](https://aikar.co/2018/07/02/tuning-the-jvm-g1gc-garbage-collector-flags-for-minecraft/) for GC tuning, which helps with performance when many users are connected.
+</ParamField>
+
+<ParamField path="USE_MEOWICE_FLAGS" type="boolean" default="false">
+  Enable [MeowIce's updated JVM flags](https://github.com/MeowIce/meowice-flags), based on Aikar's flags but optimized for Java 17 and above.
+</ParamField>
+
+<ParamField path="USE_MEOWICE_GRAALVM_FLAGS" type="boolean" default="true">
+  Enable MeowIce's flags for GraalVM when `USE_MEOWICE_FLAGS` is also enabled.
+</ParamField>
+
+<ParamField path="USE_FLARE_FLAGS" type="boolean" default="false">
+  Enable JVM flags required to fully support the [Flare profiling suite](https://blog.airplane.gg/flare).
+</ParamField>
+
+<ParamField path="USE_SIMD_FLAGS" type="boolean" default="false">
+  Enable support for optimized SIMD operations.
+</ParamField>
+
+<ParamField path="JVM_OPTS" type="string" default="">
+  Space-delimited, raw JVM arguments passed to the Minecraft server invocation. Use for -X options.
+</ParamField>
+
+<ParamField path="JVM_XX_OPTS" type="string" default="">
+  Space-delimited JVM -XX options. The JVM requires -XX options to precede -X options.
+</ParamField>
+
+<ParamField path="JVM_DD_OPTS" type="string" default="">
+  Comma-separated list of name=value or name:value pairs for system properties (-D arguments). The colon syntax is provided for platforms like Plesk that don't allow `=` in values.
+</ParamField>
+
+<ParamField path="ENABLE_JMX" type="boolean" default="false">
+  Enable remote JMX for profiling with VisualVM or JMC.
+</ParamField>
+
+<ParamField path="JMX_HOST" type="string" default="">
+  If JMX is enabled, set this to the IP/host running the Docker container. Also add port forwarding for TCP port 7091.
+</ParamField>
+
+## Server Configuration
+
+<ParamField path="EULA" type="boolean" required>
+  You **MUST** set this to `true` to accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula). The server will not start without this.
+</ParamField>
+
+<ParamField path="TYPE" type="string" default="VANILLA">
+  The server type to run. Available values:
+  - `VANILLA` - Official Minecraft server
+  - `PAPER` - PaperMC server
+  - `SPIGOT` - Spigot server
+  - `BUKKIT` - Bukkit server
+  - `FORGE` - Forge modded server
+  - `NEOFORGE` - NeoForge modded server
+  - `FABRIC` - Fabric modded server
+  - `QUILT` - Quilt modded server
+  - `PURPUR` - Purpur server
+  - `PUFFERFISH` - Pufferfish server
+  - `FOLIA` - Folia server
+  - `MAGMA` - Magma hybrid server
+  - `MOHIST` - Mohist hybrid server
+  - `ARCLIGHT` - Arclight hybrid server
+  - `CURSEFORGE` - CurseForge modpack
+  - `AUTO_CURSEFORGE` - Auto CurseForge installation
+  - `FTBA` - Feed The Beast modpack
+  - `CUSTOM` - Custom server jar
+</ParamField>
+
+<ParamField path="VERSION" type="string" default="LATEST">
+  The Minecraft version to run. Can be:
+  - `LATEST` - Latest release version
+  - `SNAPSHOT` - Latest snapshot version
+  - Specific version like `1.20.4`, `1.19.2`, etc.
+</ParamField>
+
+<ParamField path="MOTD" type="string" default="">
+  The server message of the day shown in the multiplayer server list. Supports formatting codes using the section symbol (§).
+  
+  For multi-line MOTD, embed newline as `\n`.
+</ParamField>
+
+<ParamField path="DIFFICULTY" type="string" default="easy">
+  The difficulty level. Available values: `peaceful`, `easy`, `normal`, `hard`.
+</ParamField>
+
+<ParamField path="MODE" type="string" default="survival">
+  The game mode. Available values: `creative`, `survival`, `adventure`, `spectator`.
+</ParamField>
+
+<ParamField path="LEVEL" type="string" default="world">
+  The world/level name. Maps to the `level-name` server property.
+</ParamField>
+
+<ParamField path="SERVER_PORT" type="integer" default="25565">
+  The server port. Only change this if using host networking (rarely needed).
+</ParamField>
+
+<ParamField path="ICON" type="string" default="">
+  URL or file path for the server icon image. Will be downloaded, scaled, and converted to proper format.
+</ParamField>
+
+<ParamField path="OVERRIDE_ICON" type="boolean" default="false">
+  Set to `true` to override an existing server icon.
+</ParamField>
+
+<ParamField path="CONSOLE" type="boolean" default="true">
+  Some older versions (pre-1.14) of Spigot required `--noconsole` when detaching stdin.
+</ParamField>
+
+<ParamField path="GUI" type="boolean" default="false">
+  Disable the GUI interface (should remain false for Docker).
+</ParamField>
+
+<ParamField path="EXTRA_ARGS" type="string" default="">
+  Additional arguments passed to the server jar file.
+</ParamField>
+
+## Server Operations
+
+<ParamField path="STOP_DURATION" type="integer" default="60">
+  How long (in seconds) to wait for the server to gracefully stop before forcing termination.
+</ParamField>
+
+<ParamField path="STOP_SERVER_ANNOUNCE_DELAY" type="integer" default="0">
+  Delay in seconds after announcing server shutdown before actually stopping. Gives players time to finish.
+</ParamField>
+
+<ParamField path="SETUP_ONLY" type="boolean" default="false">
+  Set to `true` to setup server files but stop before launching the server process.
+</ParamField>
+
+## RCON Configuration
+
+<ParamField path="ENABLE_RCON" type="boolean" default="true">
+  Enable/disable RCON support. **Note:** Disabling RCON removes some features like interactive console support.
+</ParamField>
+
+<ParamField path="RCON_PASSWORD" type="string" default="randomly generated">
+  The RCON password. You should change this from the default randomly generated value.
+</ParamField>
+
+<ParamField path="RCON_PORT" type="integer" default="25575">
+  The port for RCON connections.
+</ParamField>
+
+<ParamField path="BROADCAST_RCON_TO_OPS" type="boolean" default="false">
+  Sets the `broadcast-rcon-to-ops` server property.
+</ParamField>
+
+<ParamField path="RCON_CMDS_STARTUP" type="string" default="">
+  RCON commands to execute when the server starts.
+</ParamField>
+
+<ParamField path="RCON_CMDS_ON_CONNECT" type="string" default="">
+  RCON commands to execute whenever a client connects.
+</ParamField>
+
+<ParamField path="RCON_CMDS_FIRST_CONNECT" type="string" default="">
+  RCON commands to execute on the first client connection.
+</ParamField>
+
+<ParamField path="RCON_CMDS_ON_DISCONNECT" type="string" default="">
+  RCON commands to execute whenever a client disconnects.
+</ParamField>
+
+<ParamField path="RCON_CMDS_LAST_DISCONNECT" type="string" default="">
+  RCON commands to execute when the last client disconnects.
+</ParamField>
+
+## Whitelist
+
+<ParamField path="ENABLE_WHITELIST" type="boolean" default="false">
+  Enable the whitelist to manually manage allowed players.
+</ParamField>
+
+<ParamField path="WHITELIST" type="string" default="">
+  Comma-separated list of usernames and/or UUIDs to whitelist.
+</ParamField>
+
+<ParamField path="WHITELIST_FILE" type="string" default="">
+  URL or file path to a whitelist JSON file.
+</ParamField>
+
+<ParamField path="OVERRIDE_WHITELIST" type="boolean" default="false">
+  Enforce regeneration of the whitelist on each server startup.
+</ParamField>
+
+## Resource Pack
+
+<ParamField path="RESOURCE_PACK" type="string" default="">
+  URL to a custom resource pack.
+</ParamField>
+
+<ParamField path="RESOURCE_PACK_SHA1" type="string" default="">
+  SHA1 checksum of the custom resource pack for verification.
+</ParamField>
+
+<ParamField path="RESOURCE_PACK_ENFORCE" type="boolean" default="false">
+  Enforce the resource pack on clients (kick players who decline).
+</ParamField>
+
+## Auto-Pause
+
+<ParamField path="ENABLE_AUTOPAUSE" type="boolean" default="false">
+  Enable the Auto-Pause functionality to pause the server when no players are connected.
+</ParamField>
+
+<ParamField path="AUTOPAUSE_TIMEOUT_EST" type="integer" default="3600">
+  Time in seconds between last client disconnect and pausing the server.
+</ParamField>
+
+<ParamField path="AUTOPAUSE_TIMEOUT_INIT" type="integer" default="600">
+  Time in seconds between server start and pausing when no client connects.
+</ParamField>
+
+<ParamField path="AUTOPAUSE_TIMEOUT_KN" type="integer" default="120">
+  Time in seconds between port knock (e.g., server list ping) and pausing when no client connects.
+</ParamField>
+
+<ParamField path="AUTOPAUSE_PERIOD" type="integer" default="10">
+  Period in seconds of the state machine that handles pausing.
+</ParamField>
+
+<ParamField path="AUTOPAUSE_KNOCK_INTERFACE" type="string" default="eth0">
+  Network interface for the knockd daemon. Run `ifconfig` inside container to find the correct interface.
+</ParamField>
+
+<ParamField path="DEBUG_AUTOPAUSE" type="boolean" default="false">
+  Enable additional debugging output for Auto-Pause.
+</ParamField>
+
+## Auto-Stop
+
+<Note>
+  Auto-Stop is incompatible with Auto-Pause as they cancel each other out.
+</Note>
+
+<ParamField path="ENABLE_AUTOSTOP" type="boolean" default="false">
+  Enable the Auto-Stop functionality to stop the server when no players are connected.
+</ParamField>
+
+<ParamField path="AUTOSTOP_TIMEOUT_EST" type="integer" default="3600">
+  Time in seconds between last client disconnect and stopping the server.
+</ParamField>
+
+<ParamField path="AUTOSTOP_TIMEOUT_INIT" type="integer" default="1800">
+  Time in seconds between server start and stopping when no client connects.
+</ParamField>
+
+<ParamField path="AUTOSTOP_PERIOD" type="integer" default="10">
+  Period in seconds of the state machine that handles stopping.
+</ParamField>
+
+<ParamField path="DEBUG_AUTOSTOP" type="boolean" default="false">
+  Enable additional debugging output for Auto-Stop.
+</ParamField>
+
+## CurseForge
+
+<ParamField path="CF_API_KEY" type="string" required>
+  Your CurseForge (Eternal) API Key. Required for CurseForge modpack installation.
+</ParamField>
+
+<ParamField path="CF_API_KEY_FILE" type="string" default="">
+  Path to a file inside the container containing your CurseForge API Key.
+</ParamField>
+
+<ParamField path="CF_PAGE_URL" type="string" default="">
+  Page URL to a CurseForge modpack or specific file.
+</ParamField>
+
+<ParamField path="CF_SLUG" type="string" default="">
+  The CurseForge modpack slug instead of full URL.
+</ParamField>
+
+<ParamField path="CF_FILE_ID" type="string" default="">
+  The CurseForge numerical file ID.
+</ParamField>
+
+<ParamField path="CF_FILENAME_MATCHER" type="string" default="">
+  Substring to match the desired modpack filename.
+</ParamField>
+
+<ParamField path="CF_EXCLUDE_INCLUDE_FILE" type="string" default="">
+  Path to JSON file declaring global and per-modpack exclusions/inclusions. Set to empty string to disable defaults.
+</ParamField>
+
+<ParamField path="CF_EXCLUDE_MODS" type="string" default="">
+  Comma or space-delimited list of project slugs or IDs to exclude.
+</ParamField>
+
+<ParamField path="CF_FORCE_INCLUDE_MODS" type="string" default="">
+  Comma or space-delimited list of project slugs or IDs to force include.
+</ParamField>
+
+<ParamField path="CF_FORCE_SYNCHRONIZE" type="boolean" default="false">
+  Force re-evaluation of excludes/includes.
+</ParamField>
+
+<ParamField path="CF_SET_LEVEL_FROM" type="string" default="">
+  Set LEVEL from modpack world data. Values: `WORLD_FILE` or `OVERRIDES`.
+</ParamField>
+
+<ParamField path="CF_PARALLEL_DOWNLOADS" type="integer" default="4">
+  Number of parallel mod downloads to perform.
+</ParamField>
+
+<ParamField path="CF_OVERRIDES_SKIP_EXISTING" type="boolean" default="false">
+  Skip files in overrides that already exist in data directory.
+</ParamField>
+
+<ParamField path="CF_MOD_LOADER_VERSION" type="string" default="">
+  Override the mod loader version declared by the modpack.
+</ParamField>

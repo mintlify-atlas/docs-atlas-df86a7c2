@@ -1,0 +1,539 @@
+---
+title: mc-image-helper
+description: Advanced tool for Minecraft server setup, mod installation, and configuration management
+---
+
+`mc-image-helper` is a comprehensive tool bundled with the itzg/minecraft-server image that provides complex, re-usable preparation operations for Minecraft servers. It handles mod installation, file management, version resolution, and configuration patching.
+
+<Note>
+  **Version:** 1.55.2  
+  **Repository:** [itzg/mc-image-helper](https://github.com/itzg/mc-image-helper)
+</Note>
+
+## Overview
+
+`mc-image-helper` is primarily used internally by the image's startup scripts to:
+
+- Install server types (Forge, Fabric, Paper, etc.)
+- Download and manage mods from CurseForge, Modrinth, and other sources
+- Resolve Minecraft versions
+- Copy and synchronize files
+- Patch JSON and YAML configuration files
+- Manage user permissions (whitelist, ops, banned players)
+
+## Core Commands
+
+### Version Resolution
+
+Resolve Minecraft version strings like "LATEST" or "SNAPSHOT" to actual version numbers:
+
+```bash
+mc-image-helper resolve-minecraft-version LATEST
+# Output: 1.20.4
+
+mc-image-helper resolve-minecraft-version SNAPSHOT  
+# Output: 24w10a
+```
+
+### Java Version Detection
+
+Get the major Java version running in the container:
+
+```bash
+mc-image-helper java-release
+# Output: 21
+```
+
+This is used to determine Java version compatibility for servers and mods.
+
+### File Finding
+
+Find files and directories with advanced filtering:
+
+```bash
+# Find all JAR files
+mc-image-helper find --name="*.jar" --type=file /data
+
+# Find directories with max depth
+mc-image-helper find --name="world*" --type=directory --max-depth=2 /data
+
+# Custom output format
+mc-image-helper find --name="*.jar" --format="- %P" /data/mods
+```
+
+**Options:**
+- `--name` - Filename pattern (glob)
+- `--type` - Filter by type (`file`, `directory`)
+- `--max-depth` - Maximum directory depth
+- `--format` - Output format (`%P` = relative path, `%f` = filename)
+
+### File Copying
+
+Advanced file copying with URL support and synchronization:
+
+```bash
+# Copy from URL
+mc-image-helper mcopy --url=https://example.com/mod.jar /data/mods
+
+# Copy local files
+mc-image-helper mcopy /source/mods/*.jar /data/mods
+
+# Skip existing files
+mc-image-helper mcopy --skip-existing /source/config /data/config
+```
+
+## Server Installation
+
+### Install Forge
+
+```bash
+mc-image-helper install-forge \
+  --minecraft-version=1.20.1 \
+  --forge-version=47.2.0 \
+  --output-directory=/data \
+  --results-file=/data/.forge-installer.json
+```
+
+**Options:**
+- `--minecraft-version` - Target Minecraft version
+- `--forge-version` - Forge version (or "latest", "recommended")
+- `--forge-installer` - Path to installer JAR
+- `--output-directory` - Installation directory
+- `--results-file` - JSON file with installation results
+- `--force-reinstall` - Force reinstallation
+
+### Install Fabric
+
+```bash
+mc-image-helper install-fabric-loader \
+  --minecraft-version=1.20.4 \
+  --loader-version=0.15.6 \
+  --output-directory=/data
+```
+
+**Options:**
+- `--minecraft-version` - Target Minecraft version
+- `--loader-version` - Fabric loader version
+- `--launcher-version` - Fabric launcher version
+- `--output-directory` - Installation directory
+
+### Install NeoForge
+
+```bash
+mc-image-helper install-neoforge \
+  --minecraft-version=1.20.4 \
+  --neoforge-version=20.4.80 \
+  --output-directory=/data \
+  --results-file=/data/.neoforge.json
+```
+
+### Install Quilt
+
+```bash
+mc-image-helper install-quilt \
+  --minecraft-version=1.20.4 \
+  --loader-version=0.23.1 \
+  --installer-version=0.9.0 \
+  --output-directory=/data
+```
+
+### Install Paper
+
+```bash
+mc-image-helper install-paper \
+  --minecraft-version=1.20.4 \
+  --build=latest \
+  --output-directory=/data
+```
+
+**Options:**
+- `--minecraft-version` - Target Minecraft version
+- `--build` - Build number or "latest"
+- `--output-directory` - Installation directory
+- `--results-file` - JSON file with installation results
+
+### Install Purpur
+
+```bash
+mc-image-helper install-purpur \
+  --minecraft-version=1.20.4 \
+  --build=latest \
+  --output-directory=/data
+```
+
+## Mod Platform Integration
+
+### CurseForge Modpack Installation
+
+```bash
+mc-image-helper install-curseforge \
+  --api-key="YOUR_API_KEY" \
+  --slug=all-the-mods-9 \
+  --output-directory=/data
+```
+
+**Options:**
+- `--api-key` - CurseForge API key
+- `--api-key-file` - File containing API key
+- `--slug` - Modpack slug
+- `--file-id` - Specific file ID
+- `--page-url` - Modpack page URL
+- `--filename-matcher` - Filename pattern
+- `--exclude-mods` - Mods to exclude (comma-separated)
+- `--force-include-mods` - Mods to force include
+- `--exclude-include-file` - JSON file with exclude/include rules
+- `--parallel-downloads` - Number of parallel downloads (default: 4)
+- `--output-directory` - Installation directory
+
+### CurseForge Files (Standalone Mods)
+
+```bash
+mc-image-helper curseforge-files \
+  --api-key="YOUR_API_KEY" \
+  --project-id=238222 \
+  --file-id=4826863 \
+  --output-directory=/data/mods
+```
+
+### Modrinth Modpack Installation
+
+```bash
+mc-image-helper install-modrinth-modpack \
+  --slug=fabulously-optimized \
+  --output-directory=/data
+```
+
+**Options:**
+- `--slug` - Modpack slug
+- `--version-id` - Specific version ID
+- `--version-type` - Version type (release, beta, alpha)
+- `--exclude-mods` - Mods to exclude
+- `--force-include-mods` - Mods to force include
+- `--default-exclude-includes` - Use default exclusions
+- `--output-directory` - Installation directory
+
+### Modrinth Files (Standalone Mods/Plugins)
+
+```bash
+mc-image-helper modrinth \
+  --project=sodium \
+  --version=mc1.20.4 \
+  --output-directory=/data/mods
+```
+
+**Options:**
+- `--project` - Project ID or slug
+- `--version` - Version pattern or ID
+- `--game-version` - Minecraft version filter
+- `--loader` - Mod loader filter (forge, fabric, quilt)
+- `--output-directory` - Output directory
+
+## Configuration Management
+
+### Set Server Properties
+
+Update `server.properties` with key-value pairs:
+
+```bash
+mc-image-helper set-properties \
+  --prop=difficulty=hard \
+  --prop=max-players=100 \
+  /data/server.properties
+```
+
+**Options:**
+- `--prop` - Property in format `key=value` (repeatable)
+- `--escape-unicode` - Escape unicode characters
+
+### Interpolate Variables
+
+Replace placeholders in files with environment variable values:
+
+```bash
+mc-image-helper interpolate \
+  --prefix=CFG_ \
+  --output-directory=/data/config \
+  /templates/*.yml
+```
+
+**Placeholder Syntax:**
+- `${VAR}` - Replace with environment variable
+- `${VAR:-default}` - Use default if VAR not set
+- `${VAR:+value}` - Use value if VAR is set
+
+### Patch JSON/YAML Files
+
+Apply JSON path-based patches to configuration files:
+
+```bash
+mc-image-helper patch \
+  --patch-env-prefix=PATCH_ \
+  /data/config/settings.json
+```
+
+Or use a patch definition file:
+
+```bash
+mc-image-helper patch \
+  --patch-definitions=/config/patches \
+  /data
+```
+
+**Patch Definition Format:**
+
+```json
+{
+  "patches": [
+    {
+      "file": "/data/config/server.json",
+      "ops": [
+        {
+          "path": "$.server.maxPlayers",
+          "value": 100
+        }
+      ]
+    }
+  ]
+}
+```
+
+### YAML Path Query
+
+Extract values from YAML files:
+
+```bash
+mc-image-helper yaml-path \
+  --file=/data/config.yml \
+  ".server.port"
+# Output: 25565
+```
+
+## User Management
+
+### Manage Whitelist
+
+```bash
+mc-image-helper manage-users \
+  --whitelist=player1,player2,uuid1 \
+  --output-directory=/data
+```
+
+### Manage Operators
+
+```bash
+mc-image-helper manage-users \
+  --ops=admin1,admin2 \
+  --output-directory=/data
+```
+
+### Manage Banned Players
+
+```bash
+mc-image-helper manage-users \
+  --banned-players=griefer1,griefer2 \
+  --output-directory=/data
+```
+
+**Options:**
+- `--whitelist` - Comma-separated list of players/UUIDs
+- `--whitelist-file` - URL or path to whitelist JSON
+- `--ops` - Comma-separated list of operators
+- `--ops-file` - URL or path to ops JSON
+- `--banned-players` - Comma-separated list
+- `--banned-players-file` - URL or path to banned players JSON
+- `--output-directory` - Data directory
+
+## Download Utilities
+
+### Maven Download
+
+Download artifacts from Maven repositories:
+
+```bash
+mc-image-helper maven-download \
+  --group=net.fabricmc \
+  --artifact=fabric-installer \
+  --version=latest \
+  --output-directory=/tmp
+```
+
+### GitHub Latest Release
+
+Download latest release asset from GitHub:
+
+```bash
+mc-image-helper github download-latest-asset \
+  --repo=itzg/mc-router \
+  --asset-pattern="*_linux_amd64.tar.gz" \
+  --output-directory=/usr/local/bin
+```
+
+### Generic File Download
+
+```bash
+mc-image-helper get \
+  --url=https://example.com/file.jar \
+  --output-directory=/data/mods \
+  --skip-up-to-date
+```
+
+**Options:**
+- `--url` - File URL (repeatable)
+- `--output-directory` - Output directory
+- `--output-filename` - Custom filename
+- `--skip-up-to-date` - Skip if already downloaded
+- `--skip-existing` - Skip if file exists
+
+## Vanilla Tweaks
+
+Install Vanilla Tweaks datapacks:
+
+```bash
+mc-image-helper vanillatweaks \
+  --category=datapacks \
+  --packs=coordinates-hud,player-head-drops \
+  --output-directory=/data/world/datapacks
+```
+
+**Options:**
+- `--category` - Category (datapacks, resourcepacks, craftingtweaks)
+- `--packs` - Comma-separated pack names
+- `--version` - Minecraft version
+- `--output-directory` - Output directory
+
+## Advanced Features
+
+### Version Detection from Mods
+
+Detect Minecraft version from Modrinth projects:
+
+```bash
+mc-image-helper version-from-modrinth-projects \
+  --projects=sodium,lithium,phosphor
+# Output: 1.20.4
+```
+
+### Exclude/Include File Schema
+
+For CurseForge and Modrinth, exclude/include files use this JSON schema:
+
+```json
+{
+  "global": {
+    "exclude": ["mod-slug-1", "123456"],
+    "include": ["required-mod"]
+  },
+  "modpacks": {
+    "modpack-slug": {
+      "exclude": ["optional-mod"],
+      "include": ["custom-mod"]
+    }
+  }
+}
+```
+
+- `exclude` - Project slugs or IDs to skip
+- `include` - Project slugs or IDs to force include
+- `global` - Applied to all modpacks
+- `modpacks` - Per-modpack overrides
+
+## Common Patterns
+
+### Custom Mod Installation
+
+Download mods from various sources:
+
+```bash
+# From CurseForge
+mc-image-helper curseforge-files \
+  --api-key="$CF_API_KEY" \
+  --project-id=238222 \
+  --output-directory=/data/mods
+
+# From Modrinth  
+mc-image-helper modrinth \
+  --project=sodium \
+  --game-version=1.20.4 \
+  --output-directory=/data/mods
+
+# From URL
+mc-image-helper get \
+  --url=https://example.com/custom-mod.jar \
+  --output-directory=/data/mods
+```
+
+### Server Migration
+
+Find and copy server files:
+
+```bash
+# Find server JAR
+SERVER_JAR=$(mc-image-helper find \
+  --name="*server*.jar" \
+  --type=file \
+  --max-depth=1 \
+  /data)
+
+# Copy configurations
+mc-image-helper mcopy \
+  --skip-existing \
+  /backup/config/* \
+  /data/config/
+```
+
+### Dynamic Configuration
+
+Patch configuration based on environment:
+
+```bash
+# Set via environment
+export PATCH_max_players=100
+export PATCH_difficulty=hard
+
+mc-image-helper patch \
+  --patch-env-prefix=PATCH_ \
+  /data/server.properties
+```
+
+## Environment Variable Integration
+
+Many `mc-image-helper` operations are triggered automatically by environment variables set on the container. See the [Environment Variables Reference](/api/variables-reference) for the complete list.
+
+### Examples
+
+- `TYPE=FORGE` triggers `install-forge`
+- `CF_SLUG=modpack-name` triggers `install-curseforge`
+- `MODRINTH_PROJECTS=sodium,lithium` triggers `modrinth` downloads
+
+## Troubleshooting
+
+### Enable Debug Output
+
+Add `--debug` flag to most commands:
+
+```bash
+mc-image-helper --debug install-forge ...
+```
+
+### Check Results Files
+
+Many install commands write results to JSON files:
+
+```bash
+cat /data/.forge-installer.json
+```
+
+### Version Compatibility
+
+Ensure Minecraft version matches mod/loader requirements:
+
+```bash
+mc-image-helper resolve-minecraft-version $VERSION
+```
+
+## Related Commands
+
+See also:
+- [rcon-cli](/api/rcon-cli) - Send commands to server  
+- [mc-monitor](/api/mc-monitor) - Monitor server health
+- [Environment Variables](/api/variables-reference) - Configuration reference

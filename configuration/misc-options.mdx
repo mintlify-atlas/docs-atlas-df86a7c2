@@ -1,0 +1,376 @@
+---
+title: Miscellaneous Options
+description: Additional configuration options for Docker Minecraft Server
+---
+
+This page covers various additional configuration options that don't fit into other categories but are useful for customizing your Minecraft server.
+
+## Custom Server JAR
+
+Run a custom server JAR file instead of downloading a standard server type.
+
+<ParamField path="TYPE" type="string" value="CUSTOM">
+  Must be set to `CUSTOM` to use a custom server JAR
+</ParamField>
+
+<ParamField path="CUSTOM_SERVER" type="string">
+  URL or container path to the custom server JAR file
+</ParamField>
+
+```yaml Example
+environment:
+  TYPE: CUSTOM
+  CUSTOM_SERVER: https://example.com/my-server.jar
+```
+
+<Note>
+  If it's a URL, the JAR will only be downloaded if it doesn't already exist in `/data`. To upgrade or re-download, stop the container, remove the file, and restart.
+</Note>
+
+## Force Server Re-download
+
+Force re-download of the server file for certain server types.
+
+<ParamField path="FORCE_REDOWNLOAD" type="boolean" default="false">
+  Force re-download of server file. Works with: VANILLA, FORGE, BUKKIT, SPIGOT, PAPER, CURSEFORGE, SPONGEVANILLA
+</ParamField>
+
+```bash Example with Paper
+docker run -d --pull=always \
+    -v /path/on/host:/data \
+    -e TYPE=PAPER \
+    -e FORCE_REDOWNLOAD=true \
+    -p 25565:25565 -e EULA=TRUE \
+    --name mc itzg/minecraft-server
+```
+
+## Interactive and Color Console
+
+When RCON is enabled (default) and [TTY](https://docs.docker.com/compose/compose-file/05-services/#tty) is enabled on the container, some server types output colorized logs and provide a fully interactive console.
+
+<Note>
+  To access the interactive console, use `docker attach` (not `exec`). When finished, use Control-P, Control-Q to detach without stopping the container.
+</Note>
+
+If this behavior interferes with log content:
+- In compose: set the service's `tty` parameter to `false`
+- With `docker run`: remove the `-t` argument
+
+## Logging Configuration
+
+The image can use a templated log4j2 configuration based on PaperMC's logging setup, automatically applied for versions that don't require Log4j security patches.
+
+<ParamField path="GENERATE_LOG4J2_CONFIG" type="boolean" default="false">
+  Enable templated log4j2 configuration with rolling logs and advanced features
+</ParamField>
+
+<Note>
+  This configures server logging only. To diagnose container startup, set `DEBUG=true`.
+</Note>
+
+### Log Level
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Root logger level. Values: `trace`, `debug`, `info`, `warn`, `error`
+</ParamField>
+
+```bash
+docker run -d -e LOG_LEVEL=debug ...
+```
+
+### Rolling Log Configuration
+
+<ParamField path="ROLLING_LOG_FILE_PATTERN" type="string" default="logs/%d{yyyy-MM-dd}-%i.log.gz">
+  Pattern for rolled log file names
+</ParamField>
+
+<ParamField path="ROLLING_LOG_MAX_FILES" type="number" default="1000">
+  Maximum number of archived log files to keep
+</ParamField>
+
+### Log Message Formats
+
+Customize log output using [Log4j2 Pattern Layout syntax](https://logging.apache.org/log4j/2.x/manual/layouts.html#PatternLayout):
+
+<ParamField path="LOG_CONSOLE_FORMAT" type="string" default="[%d{HH:mm:ss}] [%t/%level]: %msg%n">
+  Format for console output (visible in `docker logs`)
+</ParamField>
+
+<ParamField path="LOG_FILE_FORMAT" type="string" default="[%d{HH:mm:ss}] [%t/%level]: %msg%n">
+  Format for file logs (written to `logs/latest.log`)
+</ParamField>
+
+<ParamField path="LOG_TERMINAL_FORMAT" type="string" default="[%d{HH:mm:ss} %level]: %msg%n">
+  Format for interactive terminal console (used with `docker attach`)
+</ParamField>
+
+<Tabs>
+  <Tab title="Simple Timestamp Customization">
+    ```yaml
+    environment:
+      LOG_CONSOLE_FORMAT: "[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%t/%level]: %msg%n"
+      LOG_FILE_FORMAT: "[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%t/%level]: %msg%n"
+    ```
+  </Tab>
+  <Tab title="Advanced Customization">
+    ```yaml
+    environment:
+      LOG_LEVEL: debug
+      LOG_CONSOLE_FORMAT: "%d{ISO8601} %-5level [%t] %logger{36} - %msg%n"
+      LOG_FILE_FORMAT: "%d{ISO8601} %-5level [%t] %logger{36} - %msg%n"
+      ROLLING_LOG_MAX_FILES: 50
+    ```
+  </Tab>
+</Tabs>
+
+<ParamField path="ENABLE_ROLLING_LOGS" type="boolean" default="false">
+  Legacy option for backward compatibility. Rolling logs are now enabled by default through templated configuration.
+</ParamField>
+
+<Warning>
+  The templated log4j2 configuration may interfere with interactive/color consoles.
+</Warning>
+
+## HTTP Proxy
+
+Configure HTTP/HTTPS proxy for server connections.
+
+<ParamField path="PROXY" type="string">
+  Proxy host:port
+</ParamField>
+
+<ParamField path="PROXY_HOST" type="string">
+  Proxy host (separate from port)
+</ParamField>
+
+<ParamField path="PROXY_PORT" type="string">
+  Proxy port (separate from host)
+</ParamField>
+
+<ParamField path="PROXY_NON_PROXY_HOSTS" type="string">
+  Pipe-delimited list of hosts to exclude from proxying
+</ParamField>
+
+See the [example compose file](https://github.com/itzg/docker-minecraft-server/blob/master/examples/proxied/compose.yml) for a Squid proxy reference.
+
+## Timezone Configuration
+
+<ParamField path="TZ" type="string" default="UTC">
+  Configure timezone to match your locale
+</ParamField>
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```bash
+    docker run -d -it --pull=always \
+      -e TZ=Europe/London \
+      -p 25565:25565 \
+      --name mc itzg/minecraft-server
+    ```
+  </Tab>
+  <Tab title="Volume Mount">
+    ```bash
+    docker run -d -it --pull=always \
+      -v /etc/timezone:/etc/timezone:ro \
+      -p 25565:25565 \
+      --name mc itzg/minecraft-server
+    ```
+    
+    <Note>Not supported on Windows</Note>
+  </Tab>
+</Tabs>
+
+## Download Extra Configs
+
+Download additional configuration files for plugins or mods.
+
+<ParamField path="DOWNLOAD_EXTRA_CONFIGS" type="string">
+  Newline or comma-separated list of `path<url` pairs to download configuration files
+</ParamField>
+
+<Tabs>
+  <Tab title="Multi-line Format">
+    ```yaml
+    environment:
+      DOWNLOAD_EXTRA_CONFIGS: |
+        plugins/WorldEdit<https://raw.githubusercontent.com/EngineHub/WorldEdit/refs/heads/version/7.3.x/worldedit-bukkit/src/main/resources/defaults/config.yml
+        plugins/EssentialsX<https://raw.githubusercontent.com/EssentialsX/Essentials/refs/heads/2.x/Essentials/src/main/resources/config.yml
+    ```
+  </Tab>
+  <Tab title="Single Line Format">
+    ```yaml
+    environment:
+      DOWNLOAD_EXTRA_CONFIGS: "plugins/WorldEdit<https://example.com/worldedit.yml,config<https://example.com/another.yml"
+    ```
+  </Tab>
+</Tabs>
+
+Files are downloaded to `/data/` relative paths. Example: `plugins/WorldEdit` saves as `/data/plugins/WorldEdit/config.yml`.
+
+<Note>
+  Downloaded files can be further processed using [environment variable replacement](/configuration/interpolation) or [patch definitions](/configuration/interpolation#patching-existing-files).
+</Note>
+
+## Init Log Timestamps
+
+<ParamField path="LOG_TIMESTAMP" type="boolean" default="false">
+  Include timestamps in init logs (before Minecraft server starts)
+</ParamField>
+
+```bash Without timestamps
+[init] Starting the Minecraft server...
+```
+
+```bash With timestamps
+[init] 2022-02-05 16:58:33+00:00 Starting the Minecraft server...
+```
+
+## Setup Only Mode
+
+<ParamField path="SETUP_ONLY" type="boolean" default="false">
+  Setup server files and stop before launching the server process. Useful for host-attached data directories.
+</ParamField>
+
+```yaml Example
+environment:
+  SETUP_ONLY: "true"
+```
+
+## Console Options
+
+<ParamField path="CONSOLE" type="boolean" default="true">
+  Some older Spigot versions (pre-1.14) require `--noconsole` when detaching stdin. Set to `false` for those versions.
+</ParamField>
+
+<ParamField path="GUI" type="boolean" default="true">
+  Explicitly disable GUI interface. Some older servers get confused and think GUI is enabled.
+</ParamField>
+
+```yaml Example
+environment:
+  CONSOLE: "false"  # For pre-1.14 Spigot
+  GUI: "false"      # Explicitly disable GUI
+```
+
+## Health Monitoring
+
+Configure health check monitoring for the Minecraft server.
+
+<ParamField path="SERVER_HOST" type="string" default="localhost">
+  Host address of the Minecraft server for health monitoring
+</ParamField>
+
+<ParamField path="SERVER_PORT" type="number" default="25565">
+  Port number for health monitoring
+</ParamField>
+
+```yaml Example
+environment:
+  SERVER_HOST: minecraft.example.com
+  SERVER_PORT: 25565
+```
+
+## Server Shutdown Options
+
+<ParamField path="STOP_DURATION" type="number" default="60">
+  How long (in seconds) to wait for graceful shutdown after sending stop command
+</ParamField>
+
+<ParamField path="STOP_SERVER_ANNOUNCE_DELAY" type="number">
+  Seconds to delay after shutdown announcement to allow players to finish activities
+</ParamField>
+
+<Warning>
+  The Docker stop grace period must be longer than announce delay. Increase using [the -t option on docker compose down](https://docs.docker.com/compose/reference/down/) or set [stop_grace_period](https://docs.docker.com/compose/compose-file/05-services/#stop_grace_period) in compose.
+</Warning>
+
+```yaml Example
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      STOP_SERVER_ANNOUNCE_DELAY: 30
+    stop_grace_period: 2m
+```
+
+Bypass announce delay with `SIGUSR1` signal:
+
+```bash
+docker stop --signal SIGUSR1 mc
+# or
+docker compose kill --signal SIGUSR1
+```
+
+## Performance Optimization Flags
+
+### Flare Profiling
+
+<ParamField path="USE_FLARE_FLAGS" type="boolean" default="false">
+  Enable JVM flags for [Flare profiling suite](https://blog.airplane.gg/flare). Built into Pufferfish/Purpur, available as [plugin](https://github.com/TECHNOVE/FlarePlugin) for others.
+</ParamField>
+
+```bash
+docker run -d -e USE_FLARE_FLAGS=true ...
+```
+
+### SIMD Operations
+
+<ParamField path="USE_SIMD_FLAGS" type="boolean" default="false">
+  Enable optimized SIMD operations. Supported by Pufferfish and Purpur.
+</ParamField>
+
+```bash
+docker run -d -e USE_SIMD_FLAGS=true ...
+```
+
+## Debug Mode
+
+<ParamField path="DEBUG" type="boolean" default="false">
+  Enable debug output for container startup diagnostics
+</ParamField>
+
+```yaml
+environment:
+  DEBUG: "true"
+```
+
+## Complete Example
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    tty: true
+    stdin_open: true
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.20.4"
+      
+      # Logging
+      GENERATE_LOG4J2_CONFIG: "true"
+      LOG_LEVEL: info
+      LOG_TIMESTAMP: "true"
+      ROLLING_LOG_MAX_FILES: 30
+      
+      # Timezone
+      TZ: America/New_York
+      
+      # Performance
+      USE_FLARE_FLAGS: "true"
+      USE_SIMD_FLAGS: "true"
+      
+      # Shutdown
+      STOP_SERVER_ANNOUNCE_DELAY: 30
+      STOP_DURATION: 90
+      
+      # Download configs
+      DOWNLOAD_EXTRA_CONFIGS: |
+        plugins/WorldEdit<https://raw.githubusercontent.com/EngineHub/WorldEdit/refs/heads/version/7.3.x/worldedit-bukkit/src/main/resources/defaults/config.yml
+      
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    stop_grace_period: 2m
+```

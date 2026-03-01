@@ -1,0 +1,210 @@
+---
+title: Spiget Resources
+description: Auto-download SpigotMC plugins using the Spiget API
+---
+
+The `SPIGET_RESOURCES` variable automatically downloads [Spigot/Bukkit/Paper plugins](https://www.spigotmc.org/resources/) using [the Spiget API](https://spiget.org/).
+
+Resources that are zip files will be expanded into the plugins directory, and resources that are jar files will be moved there.
+
+<Note>
+The variable is purposely spelled SPIG**E**T with an "E" (not SPIGOT).
+</Note>
+
+## Finding Resource IDs
+
+The **resource ID** is the numerical part of the SpigotMC URL after the shortname/slug and a dot.
+
+**Example:**
+
+```
+https://www.spigotmc.org/resources/luckperms.28140/
+                                             ^^^^^
+                                          Resource ID
+```
+
+For LuckPerms, the resource ID is **28140**.
+
+## Basic Usage
+
+Set `SPIGET_RESOURCES` to a comma-separated list of SpigotMC resource IDs.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  TYPE: PAPER
+  SPIGET_RESOURCES: "28140,34315"
+```
+
+```bash Docker Run
+-e TYPE=PAPER \
+-e SPIGET_RESOURCES="28140,34315"
+```
+</CodeGroup>
+
+This example downloads:
+- [LuckPerms](https://www.spigotmc.org/resources/luckperms.28140/) (28140)
+- [Vault](https://www.spigotmc.org/resources/vault.34315/) (34315)
+
+## Multiple Resources
+
+You can specify multiple resource IDs in different formats:
+
+<CodeGroup>
+```yaml Multi-line (Docker Compose)
+environment:
+  SPIGET_RESOURCES: |
+    28140
+    34315
+    19254
+```
+
+```bash Comma-separated
+-e SPIGET_RESOURCES="28140,34315,19254"
+```
+</CodeGroup>
+
+## Complete Example
+
+<Steps>
+
+<Step title="Find plugin resource IDs">
+
+Visit [SpigotMC Resources](https://www.spigotmc.org/resources/) and find the plugins you want:
+
+- LuckPerms: https://www.spigotmc.org/resources/luckperms.28140/ → ID: **28140**
+- Vault: https://www.spigotmc.org/resources/vault.34315/ → ID: **34315**
+- WorldEdit: https://www.spigotmc.org/resources/worldedit.13932/ → ID: **13932**
+
+</Step>
+
+<Step title="Create docker-compose.yml">
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21"
+      SPIGET_RESOURCES: |
+        28140
+        34315
+        13932
+    volumes:
+      - minecraft-data:/data
+    ports:
+      - "25565:25565"
+
+volumes:
+  minecraft-data:
+```
+
+</Step>
+
+<Step title="Start the server">
+
+```bash
+docker compose up -d
+```
+
+The container will:
+1. Download each plugin from SpigotMC via Spiget
+2. Extract zip files or move jar files to `/data/plugins`
+3. Start the server
+
+</Step>
+
+<Step title="Verify installation">
+
+Check the logs to confirm plugin installation:
+
+```bash
+docker compose logs -f minecraft
+```
+
+You should see messages about the plugins being loaded.
+
+</Step>
+
+</Steps>
+
+## Limitations
+
+<Warning>
+**Some plugins don't permit automated downloads**
+
+Some plugins, such as [EssentialsX](https://www.spigotmc.org/resources/essentialsx.9089/) (resource ID 9089), do not allow automated downloads via Spiget.
+
+For these plugins, you must:
+1. Manually download the plugin jar file
+2. Place it in a local directory
+3. Mount that directory to the container
+
+**Example:**
+
+```yaml
+volumes:
+  - ./plugins:/plugins:ro
+  - minecraft-data:/data
+```
+
+See the [overview page](/mods-plugins/overview#volume-mount-points) for more information about the `/plugins` mount point.
+</Warning>
+
+## Popular Plugin Resource IDs
+
+Here are some commonly used plugins:
+
+| Plugin | Resource ID | URL |
+|--------|-------------|-----|
+| LuckPerms | 28140 | https://www.spigotmc.org/resources/luckperms.28140/ |
+| Vault | 34315 | https://www.spigotmc.org/resources/vault.34315/ |
+| WorldEdit | 13932 | https://www.spigotmc.org/resources/worldedit.13932/ |
+| WorldGuard | 13749 | https://www.spigotmc.org/resources/worldguard.13749/ |
+| EssentialsX | 9089 | https://www.spigotmc.org/resources/essentialsx.9089/ |
+| CoreProtect | 8631 | https://www.spigotmc.org/resources/coreprotect.8631/ |
+
+<Note>
+Not all of these plugins may permit automated downloads. Check the plugin's resource page for download restrictions.
+</Note>
+
+## Environment Variables Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SPIGET_RESOURCES` | Comma-separated list of SpigotMC resource IDs | Yes |
+
+## Combining with Other Methods
+
+You can combine `SPIGET_RESOURCES` with other plugin installation methods:
+
+```yaml
+environment:
+  TYPE: PAPER
+  VERSION: "1.21"
+  # Spiget downloads
+  SPIGET_RESOURCES: "28140,34315"
+  # Direct URLs for plugins not on SpigotMC
+  PLUGINS: |
+    https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot
+    https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot
+volumes:
+  # Manually downloaded plugins
+  - ./plugins:/plugins:ro
+  - minecraft-data:/data
+```
+
+This configuration:
+1. Downloads LuckPerms and Vault via Spiget
+2. Downloads Geyser and Floodgate from direct URLs
+3. Copies plugins from local `./plugins` directory
+
+<Note>
+All plugin installation methods are processed in order:
+1. `/plugins` volume mount
+2. `SPIGET_RESOURCES`
+3. `PLUGINS` variable
+4. Other methods (Modrinth, etc.)
+</Note>

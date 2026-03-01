@@ -1,0 +1,245 @@
+---
+title: Data Directory Management
+description: Manage the Minecraft server data directory with volumes, bind mounts, and persistence strategies
+---
+
+All Minecraft server files are stored in the container's `/data` directory. Proper data directory management ensures your worlds, configurations, and player data persist across container restarts.
+
+## Data Directory Structure
+
+Everything the container manages is located under `/data`:
+
+- World files and saves
+- Server configuration (`server.properties`)
+- Plugin and mod files
+- Player data
+- Server logs
+
+<Warning>
+  The `/data` path is pre-declared as a volume. If you don't configure volume mapping, Docker will create an anonymous volume that may be deleted when the container is removed.
+</Warning>
+
+## Bind Mounts (Recommended)
+
+The most common approach is to use bind mounts to map a host directory to the container's `/data` directory.
+
+### Using Docker Run
+
+```bash
+docker run -d \
+  -v /home/user/minecraft-data:/data \
+  -e EULA=TRUE \
+  -p 25565:25565 \
+  itzg/minecraft-server
+```
+
+Breaking down the volume syntax:
+
+```
+-v /home/user/minecraft-data:/data
+   -------------------------  -----
+    |                          |
+    |                          +-- Must always be /data
+    |
+    +-- Replace with your host directory path
+```
+
+### Using Docker Compose
+
+With Docker Compose, you can use relative paths:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+    volumes:
+      # Relative directory - automatically created
+      - ./minecraft-data:/data
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+```
+
+<Note>
+  Docker automatically creates the `minecraft-data` directory relative to the compose file location if it doesn't exist.
+</Note>
+
+## Special System Configurations
+
+### Rootless Containers
+
+When running rootless containers with Podman, SELinux, or AppArmor, append `:Z` to the volume mapping:
+
+```bash
+# Rootless with Podman
+podman run -d \
+  -v /home/user/minecraft-data:/data:Z \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+```yaml
+# Docker Compose with SELinux
+services:
+  mc:
+    image: itzg/minecraft-server
+    volumes:
+      - ./minecraft-data:/data:Z
+```
+
+<Warning>
+  The `:Z` option relabels the content so it can be shared between containers. Use with caution in multi-container setups.
+</Warning>
+
+## Anonymous Volumes
+
+If you start a container without specifying a volume, Docker creates an anonymous volume automatically:
+
+```bash
+# This creates an anonymous volume
+docker run -d --name mc -e EULA=TRUE itzg/minecraft-server
+```
+
+<Note>
+  Anonymous volumes are convenient for testing but are subject to removal when the container is deleted.
+</Note>
+
+## Converting Anonymous to Named Volume
+
+If you started with an anonymous volume, you can migrate the data to a named volume:
+
+<Steps>
+  <Step title="Stop the existing container">
+    ```bash
+    docker stop mc
+    ```
+  </Step>
+  
+  <Step title="Copy data to named volume">
+    Use a temporary container to copy the anonymous volume's content:
+    
+    ```bash
+    docker run --rm \
+      --volumes-from mc \
+      -v mc:/new \
+      alpine cp -avT /data /new
+    ```
+  </Step>
+  
+  <Step title="Recreate container with named volume">
+    ```bash
+    docker run -d -it --name mc-new \
+      -v mc:/data \
+      -p 25565:25565 \
+      -e EULA=TRUE \
+      -e MEMORY=2G \
+      itzg/minecraft-server
+    ```
+  </Step>
+</Steps>
+
+## Locating Anonymous Volume Data
+
+To find where an anonymous volume is stored on the host:
+
+```bash
+docker inspect -f "{{json .Mounts}}" CONTAINER_NAME_OR_ID
+```
+
+The `Source` field shows the host filesystem path.
+
+**Example output:**
+
+```json
+[
+  {
+    "Type": "volume",
+    "Name": "a1b2c3d4e5f6...",
+    "Source": "/var/lib/docker/volumes/a1b2c3d4e5f6/_data",
+    "Destination": "/data",
+    "Driver": "local",
+    "Mode": "z",
+    "RW": true,
+    "Propagation": ""
+  }
+]
+```
+
+<Note>
+  On Windows with WSL, the volumes path is `\\wsl$\docker-desktop-data\data\docker\volumes`
+</Note>
+
+## Editing Configuration Files
+
+With bind mounts, you can edit server files directly on the host:
+
+<Steps>
+  <Step title="Stop the server">
+    ```bash
+    docker stop mc
+    ```
+  </Step>
+  
+  <Step title="Edit files on host">
+    ```bash
+    # Edit server.properties
+    nano /home/user/minecraft-data/server.properties
+    ```
+  </Step>
+  
+  <Step title="Restart the server">
+    ```bash
+    docker start mc
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+1. **Always use named volumes or bind mounts** for production servers
+2. **Use relative paths in Compose files** for portability
+3. **Backup the `/data` directory regularly** before major changes
+4. **Use `:Z` suffix** when required by your system security policies
+5. **Document your volume paths** for team members
+
+## Volume Backup
+
+Regularly backup your data directory:
+
+```bash
+# Create backup
+tar -czf minecraft-backup-$(date +%Y%m%d).tar.gz /home/user/minecraft-data
+
+# Restore from backup
+tar -xzf minecraft-backup-20260301.tar.gz -C /
+```
+
+## Troubleshooting
+
+### Permission Issues
+
+If you encounter permission errors:
+
+```bash
+# Check ownership
+ls -la /home/user/minecraft-data
+
+# Fix permissions (adjust UID/GID as needed)
+sudo chown -R 1000:1000 /home/user/minecraft-data
+```
+
+### Data Not Persisting
+
+Verify your volume mapping:
+
+```bash
+# Check container mounts
+docker inspect -f "{{json .Mounts}}" mc | jq
+
+# Verify data exists in host directory
+ls -la /home/user/minecraft-data
+```

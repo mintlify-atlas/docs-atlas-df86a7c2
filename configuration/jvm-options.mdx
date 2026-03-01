@@ -1,0 +1,303 @@
+---
+title: JVM Options
+description: Configure Java Virtual Machine options and memory settings
+---
+
+This page covers all JVM-related configuration options for optimizing your Minecraft server's Java runtime performance.
+
+## Memory Configuration
+
+By default, the image declares an initial and maximum Java memory-heap limit of 1 GB. There are several ways to adjust memory settings.
+
+### Basic Memory Settings
+
+<ParamField path="MEMORY" type="string" default="1G">
+  Sets both initial (`Xms`) and max (`Xmx`) memory heap settings of the JVM.
+  
+  Supports formats:
+  - Absolute sizes: `1G`, `2G`, `2048M`, `512M`
+  - Percentages: `50%`, `75%`
+</ParamField>
+
+<ParamField path="INIT_MEMORY" type="string">
+  Independently sets the initial heap size (Xms). Overrides MEMORY for initial size.
+</ParamField>
+
+<ParamField path="MAX_MEMORY" type="string">
+  Independently sets the max heap size (Xmx). Overrides MEMORY for max size.
+</ParamField>
+
+<Tabs>
+  <Tab title="Single Memory Value">
+    ```yaml
+    environment:
+      MEMORY: 2G
+    ```
+  </Tab>
+  <Tab title="Separate Init and Max">
+    ```yaml
+    environment:
+      INIT_MEMORY: 1G
+      MAX_MEMORY: 4G
+    ```
+  </Tab>
+  <Tab title="Percentage-Based">
+    ```yaml
+    environment:
+      MEMORY: 75%
+    ```
+  </Tab>
+</Tabs>
+
+### Percentage-Based Memory
+
+Percentage-based heap sizing allows control over heap size relative to container memory limits without absolute values.
+
+<Note>
+  Percentage based heap sizing uses `-XX:InitialRAMPercentage` for `INIT_MEMORY` and `-XX:MaxRAMPercentage` for `MAX_MEMORY`. See [this article](https://www.baeldung.com/java-jvm-parameters-rampercentage) for details.
+</Note>
+
+### Automatic JVM Memory Calculation
+
+To let the JVM calculate heap size from the container's declared memory limit, unset `MEMORY` with an empty value:
+
+```bash
+docker run -d -e MEMORY="" ...
+```
+
+By default, the JVM will use 25% of the container memory limit as the heap limit.
+
+<Warning>
+  The settings above only set the Java **heap** limits. Memory resource requests and limits on the overall container should also account for non-heap memory usage. An extra 25% is [a general best practice](https://dzone.com/articles/best-practices-java-memory-arguments-for-container).
+</Warning>
+
+## General JVM Options
+
+<ParamField path="JVM_OPTS" type="string">
+  Space-delimited, raw JVM arguments passed to the Minecraft Server invocation. For standard JVM options like `-Xmx`, `-Xms`, etc.
+</ParamField>
+
+<ParamField path="JVM_XX_OPTS" type="string">
+  Space-delimited JVM arguments for `-XX` options. The JVM requires `-XX` options to precede `-X` options.
+</ParamField>
+
+<ParamField path="JVM_DD_OPTS" type="string">
+  Comma-separated list of `name=value` or `name:value` pairs for system properties. Shorthand for passing multiple `-D` arguments.
+</ParamField>
+
+<Tabs>
+  <Tab title="JVM_OPTS">
+    ```bash
+    docker run -d -e JVM_OPTS="-XsomeJVMOption -DpropName=value" ...
+    ```
+  </Tab>
+  <Tab title="Compose List Syntax">
+    ```yaml
+    environment:
+      - EULA=true
+      - JVM_OPTS=-XsomeJVMOption -DpropName=value
+    ```
+    
+    <Note>Do not include quotes with list syntax</Note>
+  </Tab>
+  <Tab title="Compose Object Syntax (Recommended)">
+    ```yaml
+    environment:
+      EULA: "true"
+      JVM_OPTS: "-XsomeJVMOption -DpropName=value"
+      # or without quotes
+      # JVM_OPTS: -XsomeJVMOption -DpropName=value
+    ```
+  </Tab>
+</Tabs>
+
+### System Properties Shorthand
+
+Instead of passing multiple `-D` arguments in `JVM_OPTS`, use `JVM_DD_OPTS`:
+
+<CodeGroup>
+```yaml Using JVM_OPTS
+environment:
+  JVM_OPTS: -Dfml.queryResult=confirm -Dname=value
+```
+
+```yaml Using JVM_DD_OPTS (Shorthand)
+environment:
+  JVM_DD_OPTS: fml.queryResult=confirm,name=value
+```
+
+```yaml Colon Syntax (for platforms like Plesk)
+environment:
+  JVM_DD_OPTS: fml.queryResult:confirm,name:value
+```
+</CodeGroup>
+
+<Note>
+  The colon syntax is provided for management platforms like Plesk that don't allow `=` inside a value.
+</Note>
+
+## Optimized JVM Flags
+
+### Aikar's Flags
+
+[Aikar's research](https://aikar.co/2018/07/02/tuning-the-jvm-g1gc-garbage-collector-flags-for-minecraft/) provides optimal JVM flags for GC tuning, important for servers with many concurrent users. [PaperMC also explains](https://docs.papermc.io/paper/aikars-flags) what these flags do.
+
+<ParamField path="USE_AIKAR_FLAGS" type="boolean" default="false">
+  Enable Aikar's optimized GC flags for Minecraft servers.
+</ParamField>
+
+```bash
+docker run -d -e USE_AIKAR_FLAGS=true ...
+```
+
+<Note>
+  When `MEMORY` is greater than or equal to 12G, the Aikar flags are automatically adjusted according to the article's recommendations.
+</Note>
+
+### MeowIce's Flags
+
+[MeowIce's flags](https://github.com/MeowIce/meowice-flags) are an updated set based on Aikar's flags with optimizations for Java 17 and above.
+
+<ParamField path="USE_MEOWICE_FLAGS" type="boolean" default="false">
+  Enable MeowIce's optimized JVM flags (Java 17+)
+</ParamField>
+
+<ParamField path="USE_MEOWICE_GRAALVM_FLAGS" type="boolean" default="false">
+  Enable GraalVM-specific optimizations when using MeowIce flags. Only applies when `USE_MEOWICE_FLAGS=true`.
+</ParamField>
+
+```yaml Example
+environment:
+  USE_MEOWICE_FLAGS: "true"
+  USE_MEOWICE_GRAALVM_FLAGS: "true"
+```
+
+### Flare Profiling Flags
+
+[Flare](https://blog.airplane.gg/flare) is a profiling suite built into Pufferfish/Purpur and available as a [plugin](https://github.com/TECHNOVE/FlarePlugin) for other server types.
+
+<ParamField path="USE_FLARE_FLAGS" type="boolean" default="false">
+  Enable JVM flags required for Flare profiling suite
+</ParamField>
+
+```bash
+docker run -d -e USE_FLARE_FLAGS=true ...
+```
+
+### SIMD Optimization Flags
+
+SIMD (Single Instruction, Multiple Data) operations are supported by Pufferfish and Purpur for performance optimization.
+
+<ParamField path="USE_SIMD_FLAGS" type="boolean" default="false">
+  Enable support for optimized SIMD operations
+</ParamField>
+
+```bash
+docker run -d -e USE_SIMD_FLAGS=true ...
+```
+
+## Remote JMX Monitoring
+
+Enable remote JMX for profiling with tools like VisualVM or Java Mission Control.
+
+<ParamField path="ENABLE_JMX" type="boolean" default="false">
+  Enable remote JMX monitoring
+</ParamField>
+
+<ParamField path="JMX_HOST" type="string">
+  IP/hostname of the Docker host running the container
+</ParamField>
+
+<ParamField path="JMX_PORT" type="number" default="7091">
+  JMX port to expose
+</ParamField>
+
+<Tabs>
+  <Tab title="docker run">
+    ```bash
+    docker run -d \
+      -e ENABLE_JMX=true \
+      -e JMX_HOST=$HOSTNAME \
+      -p 7091:7091 \
+      itzg/minecraft-server
+    ```
+  </Tab>
+  <Tab title="docker compose">
+    ```yaml
+    environment:
+      ENABLE_JMX: "true"
+      JMX_HOST: ${HOSTNAME}
+      JMX_PORT: "7092"
+    ports:
+      - "7092:7092"
+    ```
+  </Tab>
+</Tabs>
+
+## OpenJ9 Specific Options
+
+The OpenJ9 image tags include specific optimization variables:
+
+<ParamField path="TUNE_VIRTUALIZED" type="boolean" default="false">
+  Enable [optimization for virtualized environments](https://www.eclipse.org/openj9/docs/xtunevirtualized/). OpenJ9 images only.
+</ParamField>
+
+<ParamField path="TUNE_NURSERY_SIZES" type="boolean" default="false">
+  Configure nursery sizes where initial size is 50% of `MAX_MEMORY` and max size is 80%. OpenJ9 images only.
+</ParamField>
+
+```yaml OpenJ9 Example
+environment:
+  TUNE_VIRTUALIZED: "true"
+  TUNE_NURSERY_SIZES: "true"
+```
+
+## Complete Example
+
+```yaml compose.yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.20.4"
+      
+      # Memory Configuration
+      INIT_MEMORY: 2G
+      MAX_MEMORY: 8G
+      
+      # Optimized Flags
+      USE_AIKAR_FLAGS: "true"
+      
+      # Additional JVM Options
+      JVM_DD_OPTS: "fml.queryResult=confirm"
+      
+      # JMX Monitoring
+      ENABLE_JMX: "true"
+      JMX_HOST: ${HOSTNAME}
+      
+    ports:
+      - "25565:25565"
+      - "7091:7091"
+    volumes:
+      - ./data:/data
+```
+
+## Best Practices
+
+<Note>
+  **Memory Allocation**: Start with 2-4GB for small servers (1-10 players). Increase to 6-8GB for 10-20 players, and 10-16GB for larger servers.
+</Note>
+
+<Note>
+  **Aikar's Flags**: Recommended for most production servers running Java 11 or higher. Automatically adjusts for servers with 12GB+ memory.
+</Note>
+
+<Note>
+  **MeowIce's Flags**: Recommended for Java 17+ servers. Provides better performance than Aikar's flags on modern Java versions.
+</Note>
+
+<Warning>
+  Always allocate container resources higher than heap size to account for non-heap memory usage (metaspace, code cache, thread stacks, etc.).
+</Warning>

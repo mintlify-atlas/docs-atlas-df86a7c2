@@ -1,0 +1,282 @@
+---
+title: Packwiz Modpacks
+description: Use packwiz for maintaining and providing modpack definitions
+---
+
+[packwiz](https://packwiz.infra.link/) is a CLI tool for maintaining and providing modpack definitions, with support for both CurseForge and Modrinth as sources.
+
+packwiz provides a lightweight, version-controlled way to manage mods and automatically download them at server startup.
+
+## What is Packwiz?
+
+packwiz uses simple TOML files to define your modpack:
+- **pack.toml** - Main modpack definition with metadata
+- **index.toml** - List of all mods in the pack
+- **mods/*.pw.toml** - Individual mod metadata files
+
+See the [packwiz tutorial](https://packwiz.infra.link/tutorials/getting-started/) for more information.
+
+## Basic Usage
+
+Set `PACKWIZ_URL` to the location of your `pack.toml` modpack definition.
+
+<CodeGroup>
+```yaml Docker Compose
+environment:
+  TYPE: FABRIC
+  PACKWIZ_URL: https://example.com/modpack/pack.toml
+```
+
+```bash Docker Run
+-e TYPE=FABRIC \
+-e PACKWIZ_URL=https://example.com/modpack/pack.toml
+```
+</CodeGroup>
+
+## Using GitHub for Packwiz Files
+
+A common pattern is to host your packwiz files on GitHub and reference the raw URL:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.21.4"
+  PACKWIZ_URL: https://raw.githubusercontent.com/username/repo/main/pack.toml
+```
+
+<Note>
+Make sure to use the **raw** GitHub URL, not the regular GitHub page URL.
+</Note>
+
+## Processing Order
+
+packwiz modpack definitions are processed **before** other mod definitions to allow for additional processing/overrides you may want to perform.
+
+Processing order:
+1. **PACKWIZ_URL** - packwiz modpack
+2. Generic packs (GENERIC_PACK)
+3. Modrinth projects (MODRINTH_PROJECTS)
+4. CurseForge files (CURSEFORGE_FILES)
+5. Individual mods (MODS)
+6. Volume mounts (/mods)
+
+This allows you to use packwiz for your base modpack and layer additional mods on top.
+
+## Client vs Server Mods
+
+packwiz is pre-configured to only download server mods.
+
+<Warning>
+If client-side mods are downloaded and cause issues, check your pack.toml configuration. Make sure any client-only mods are set to `"client"` (not `"both"`) for the side configuration item.
+</Warning>
+
+**Example mod configuration in a .pw.toml file:**
+
+```toml
+[mod]
+side = "client"  # Only install on client, not server
+```
+
+Options for `side`:
+- `"server"` - Server only
+- `"client"` - Client only
+- `"both"` - Both client and server
+
+## Complete Example
+
+<Steps>
+
+<Step title="Create a packwiz modpack">
+
+Install packwiz CLI:
+
+```bash
+go install github.com/packwiz/packwiz@latest
+```
+
+Initialize a new modpack:
+
+```bash
+mkdir my-modpack
+cd my-modpack
+packwiz init
+```
+
+Add mods from Modrinth:
+
+```bash
+packwiz modrinth add fabric-api
+packwiz modrinth add lithium
+packwiz modrinth add ferritecore
+```
+
+Or from CurseForge:
+
+```bash
+packwiz curseforge add jei
+```
+
+</Step>
+
+<Step title="Host the packwiz files">
+
+Push to GitHub:
+
+```bash
+git init
+git add .
+git commit -m "Initial modpack"
+git remote add origin https://github.com/username/my-modpack.git
+git push -u origin main
+```
+
+Your `pack.toml` will be available at:
+```
+https://raw.githubusercontent.com/username/my-modpack/main/pack.toml
+```
+
+</Step>
+
+<Step title="Configure your server">
+
+Create `docker-compose.yml`:
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.4"
+      PACKWIZ_URL: https://raw.githubusercontent.com/username/my-modpack/main/pack.toml
+    volumes:
+      - minecraft-data:/data
+    ports:
+      - "25565:25565"
+
+volumes:
+  minecraft-data:
+```
+
+</Step>
+
+<Step title="Start the server">
+
+```bash
+docker compose up -d
+```
+
+The container will:
+1. Download the pack.toml file
+2. Parse the modpack definition
+3. Download all server-side mods from Modrinth/CurseForge
+4. Install them to `/data/mods`
+5. Start the server
+
+</Step>
+
+<Step title="Update mods">
+
+To update mods, use packwiz CLI:
+
+```bash
+packwiz update --all
+git add .
+git commit -m "Update all mods"
+git push
+```
+
+Restart your server to apply updates:
+
+```bash
+docker compose restart
+```
+
+</Step>
+
+</Steps>
+
+## Combining with Other Mod Sources
+
+You can use packwiz for your base modpack and add additional mods:
+
+```yaml
+environment:
+  TYPE: FABRIC
+  VERSION: "1.21.4"
+  # Base modpack from packwiz
+  PACKWIZ_URL: https://raw.githubusercontent.com/username/my-modpack/main/pack.toml
+  # Additional mods from Modrinth
+  MODRINTH_PROJECTS: |
+    datapack:terralith
+  # Mods not available on Modrinth/CurseForge
+  MODS: |
+    https://example.com/custom-mod.jar
+```
+
+## Local Development
+
+For local development, you can serve your packwiz files using a local web server:
+
+```bash
+# In your packwiz directory
+python3 -m http.server 8080
+```
+
+Then reference it in your compose file:
+
+```yaml
+environment:
+  PACKWIZ_URL: http://host.docker.internal:8080/pack.toml
+```
+
+<Note>
+On Linux, use your host IP address instead of `host.docker.internal`.
+</Note>
+
+## Advantages of Packwiz
+
+✅ **Version Control** - Track mod changes in git
+
+✅ **Lightweight** - Only text files in your repository
+
+✅ **Multi-Source** - Support for both Modrinth and CurseForge
+
+✅ **Client + Server** - Same pack definition for both
+
+✅ **Updates** - Easy mod updates with `packwiz update`
+
+✅ **Dependencies** - Automatic dependency resolution
+
+## Environment Variables Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PACKWIZ_URL` | URL or container path to pack.toml file | Yes |
+
+## Troubleshooting
+
+### Client mods are being downloaded
+
+Check your mod .pw.toml files and ensure client-only mods have:
+
+```toml
+[mod]
+side = "client"
+```
+
+### Mods aren't updating
+
+Make sure you:
+1. Ran `packwiz update` locally
+2. Committed and pushed changes to your repository
+3. Restarted the server container
+
+### Can't access pack.toml URL
+
+For GitHub, ensure you're using the **raw** URL:
+- ✅ `https://raw.githubusercontent.com/user/repo/main/pack.toml`
+- ❌ `https://github.com/user/repo/blob/main/pack.toml`
+
+For private repositories, you may need to set up authentication or use a different hosting solution.

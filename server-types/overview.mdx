@@ -1,0 +1,130 @@
+---
+title: Server Types Overview
+description: Choose the right Minecraft server type for your needs - from vanilla to modded servers
+---
+
+The Docker Minecraft Server supports multiple server types through the `TYPE` environment variable. Each server type has its own characteristics, performance profile, and plugin/mod ecosystem.
+
+## Selecting a Server Type
+
+Set the `TYPE` environment variable to one of the supported server types:
+
+```yaml
+environment:
+  TYPE: PAPER  # or VANILLA, FABRIC, FORGE, etc.
+```
+
+<Note>
+  The `VERSION` environment variable controls the Minecraft version (e.g., 1.20.4) and works across all server types. Each server type may have additional version-specific variables.
+</Note>
+
+## Available Server Types
+
+### Official Servers
+
+<CardGroup cols={2}>
+  <Card title="Vanilla" icon="cube" href="/server-types/vanilla">
+    Official Mojang server software - the baseline Minecraft experience
+  </Card>
+</CardGroup>
+
+### Plugin-Based Servers
+
+These servers support Bukkit/Spigot plugins and focus on performance and customization.
+
+<CardGroup cols={2}>
+  <Card title="Paper" icon="file-lines" href="/server-types/paper">
+    High-performance fork with extensive optimizations and plugin support
+  </Card>
+  <Card title="Bukkit/Spigot" icon="plug" href="/server-types/bukkit-spigot">
+    Classic plugin-based servers (Paper recommended instead)
+  </Card>
+</CardGroup>
+
+### Modded Servers
+
+These servers support client-side and server-side mods for extensive gameplay modifications.
+
+<CardGroup cols={2}>
+  <Card title="Fabric" icon="scissors" href="/server-types/fabric">
+    Lightweight, modern modding platform
+  </Card>
+  <Card title="Forge" icon="hammer" href="/server-types/forge">
+    Traditional modding platform with extensive mod ecosystem
+  </Card>
+  <Card title="Quilt" icon="mitten" href="/server-types/quilt">
+    Community fork of Fabric with enhanced features
+  </Card>
+</CardGroup>
+
+### Hybrid Servers
+
+Combine multiple server types to run both mods and plugins simultaneously.
+
+<CardGroup cols={1}>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Run Forge/Fabric mods alongside Bukkit/Spigot plugins
+  </Card>
+</CardGroup>
+
+### Specialized Servers
+
+<CardGroup cols={1}>
+  <Card title="Other Server Types" icon="ellipsis" href="/server-types/others">
+    SpongeVanilla, Limbo, Crucible, and custom server configurations
+  </Card>
+</CardGroup>
+
+## Quick Comparison
+
+| Server Type | Plugins | Mods | Performance | Use Case |
+|-------------|---------|------|-------------|----------|
+| Vanilla | ❌ | ❌ | Baseline | Pure Minecraft experience |
+| Paper | ✅ | ❌ | Excellent | Production servers, minigames |
+| Bukkit/Spigot | ✅ | ❌ | Good | Legacy plugin support |
+| Fabric | ❌ | ✅ | Excellent | Modern modded servers |
+| Forge | ❌ | ✅ | Good | Traditional modded servers |
+| Quilt | ❌ | ✅ | Excellent | Enhanced Fabric alternative |
+| Hybrids | ✅ | ✅ | Variable | Both mods and plugins |
+
+## Common Configuration
+
+All server types share these fundamental settings:
+
+```yaml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER        # Server type
+      VERSION: "1.20.4"  # Minecraft version
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+<Warning>
+  Always set `EULA: "TRUE"` to accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula) before starting the server.
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Choose your server type">
+    Review the individual server type pages to understand their specific features and requirements.
+  </Step>
+  
+  <Step title="Configure version settings">
+    Set the `VERSION` variable and any type-specific version variables.
+  </Step>
+  
+  <Step title="Add mods or plugins">
+    Follow the mods and plugins documentation to extend your server functionality.
+  </Step>
+  
+  <Step title="Optimize performance">
+    Configure memory settings and server properties for your player count.
+  </Step>
+</Steps>

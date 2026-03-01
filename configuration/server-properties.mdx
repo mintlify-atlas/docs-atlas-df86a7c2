@@ -1,0 +1,368 @@
+---
+title: Server Properties
+description: Configure Minecraft server.properties via environment variables
+---
+
+To unify management of the Minecraft server container, all known `server.properties` entries can be managed by environment variables. Some mappings provide additional functionality beyond the properties file.
+
+<Warning>
+  Not all server properties are supported by all versions of Minecraft. Since this image supports a wide range of versions, please consult the [server properties documentation](https://minecraft.wiki/w/Server.properties) for the version you are using.
+</Warning>
+
+## Managing server.properties
+
+If you prefer to manually manage the `server.properties` file, set `OVERRIDE_SERVER_PROPERTIES` to `false`. Similarly, you can skip the startup script's creation of `server.properties` by setting `SKIP_SERVER_PROPERTIES` to `true`.
+
+<Note>
+  To clear a server property, set the variable to an empty string, such as `-e RESOURCE_PACK=""`. An unset variable is ignored and the existing server property is left unchanged.
+</Note>
+
+To see what `server.properties` will be used by the server, set `DUMP_SERVER_PROPERTIES` to `true` and the contents will be output before the server starts.
+
+<ParamField path="OVERRIDE_SERVER_PROPERTIES" type="boolean" default="true">
+  Set to `false` to manually manage the server.properties file
+</ParamField>
+
+<ParamField path="SKIP_SERVER_PROPERTIES" type="boolean" default="false">
+  Set to `true` to skip creation of server.properties
+</ParamField>
+
+<ParamField path="DUMP_SERVER_PROPERTIES" type="boolean" default="false">
+  Set to `true` to output server.properties contents before server starts
+</ParamField>
+
+<ParamField path="SERVER_PROPERTIES_ESCAPE_UNICODE" type="boolean" default="auto">
+  Controls whether unicode characters are escaped as `\uXXXX`. By default, unicode characters are escaped for Minecraft versions less than 1.20.
+</ParamField>
+
+## Common Properties
+
+### Message of the Day
+
+The message of the day, shown below each server entry in the client UI, can be changed with the `MOTD` environment variable. By default, a message is computed from the server type and version.
+
+<ParamField path="MOTD" type="string" default="A {TYPE} Minecraft Server powered by Docker">
+  The server message of the day. Supports formatting codes using § symbol and unicode characters.
+</ParamField>
+
+The section symbol (§) and other unicode characters are automatically converted to allow [formatting codes](https://minecraft.wiki/w/Formatting_codes) to be used consistently.
+
+<Tabs>
+  <Tab title="docker run">
+    ```bash
+    docker run -d -e MOTD="A §l§cMinecraft§r §nserver" ...
+    ```
+  </Tab>
+  <Tab title="docker compose">
+    ```yaml
+    environment:
+      MOTD: "A §l§cMinecraft§r §nserver"
+    ```
+  </Tab>
+</Tabs>
+
+To produce a multi-line MOTD, embed a newline character as `\n`:
+
+<CodeGroup>
+```yaml Multi-line MOTD
+environment:
+  MOTD: |
+    line one
+    line two
+# or
+# MOTD: "line one\nline two"
+```
+
+```yaml With Placeholders
+MOD_PLATFORM: AUTO_CURSEFORGE
+CF_SLUG: craftoria
+MOTD: |
+  A %TYPE% server on %VERSION%
+  running %MODPACK_NAME% %MODPACK_VERSION%
+```
+</CodeGroup>
+
+### Difficulty
+
+<ParamField path="DIFFICULTY" type="string" default="easy">
+  The difficulty level. Valid values: `peaceful`, `easy`, `normal`, `hard`
+</ParamField>
+
+```bash
+docker run -d -e DIFFICULTY=hard ...
+```
+
+Refer to [the Minecraft wiki](https://minecraft.wiki/w/Difficulty) for more information.
+
+### Whitelist Players
+
+<Warning>
+  For public servers, it is very important to consider setting a whitelist of expected players.
+</Warning>
+
+<ParamField path="WHITELIST" type="string">
+  Comma or newline separated list of usernames and/or UUIDs to whitelist
+</ParamField>
+
+<ParamField path="WHITELIST_FILE" type="string">
+  URL or container path to a whitelist file to retrieve/copy into the standard location
+</ParamField>
+
+<ParamField path="EXISTING_WHITELIST_FILE" type="string" default="SYNC_FILE_MERGE_LIST">
+  Behavior when whitelist file already exists. Options:
+  - `SKIP`: Skip processing when file exists (same as legacy `OVERRIDE_WHITELIST=false`)
+  - `SYNCHRONIZE`: Sync users with provided list (same as legacy `OVERRIDE_WHITELIST=true`)
+  - `MERGE`: Merge WHITELIST users into existing file
+  - `SYNC_FILE_MERGE_LIST`: When WHITELIST_FILE provided, overwrite existing; merge WHITELIST users
+</ParamField>
+
+<ParamField path="ENFORCE_WHITELIST" type="boolean" default="false">
+  Enforce whitelist changes immediately when whitelist commands are used
+</ParamField>
+
+<ParamField path="ENABLE_WHITELIST" type="boolean" default="false">
+  Set the `white-list` property when manually managing the whitelist file
+</ParamField>
+
+```yaml Example
+environment:
+  WHITELIST: |
+    user1
+    user2
+    user3
+```
+
+<Note>
+  For versions prior to 1.7.3, `white-list.txt` is maintained instead. Only usernames are supported for those versions.
+</Note>
+
+### Op/Administrator Players
+
+<ParamField path="OPS" type="string">
+  Comma or newline separated list of usernames and/or UUIDs to grant operator privileges
+</ParamField>
+
+<ParamField path="OPS_FILE" type="string">
+  URL or container path to an ops file to retrieve/copy into the standard location
+</ParamField>
+
+<ParamField path="EXISTING_OPS_FILE" type="string" default="SYNC_FILE_MERGE_LIST">
+  Behavior when ops file already exists. Options:
+  - `SKIP`: Skip processing when file exists
+  - `SYNCHRONIZE`: Sync users with provided list, retaining level and bypassesPlayerLimit
+  - `MERGE`: Merge OPS users into existing file
+  - `SYNC_FILE_MERGE_LIST`: When OPS_FILE provided, overwrite existing; merge OPS users
+</ParamField>
+
+<ParamField path="USER_API_PROVIDER" type="string" default="playerdb">
+  API provider for username resolution. Options: `playerdb` or `mojang`
+</ParamField>
+
+```yaml Example
+environment:
+  OPS: |
+    user1
+    user2
+    user3
+```
+
+### RCON
+
+RCON is **enabled by default** to allow for graceful shutdown and backup coordination.
+
+<ParamField path="ENABLE_RCON" type="boolean" default="true">
+  Enable RCON support. Disabling removes some features like interactive and color console support.
+</ParamField>
+
+<ParamField path="RCON_PASSWORD" type="string">
+  RCON password. Randomly generated by default on each startup.
+</ParamField>
+
+<ParamField path="RCON_PASSWORD_FILE" type="string">
+  Path to file containing RCON password. Recommended for Docker Secrets.
+</ParamField>
+
+<ParamField path="RCON_PORT" type="number" default="25575">
+  RCON port within the container. Do not change unless you have a very good reason.
+</ParamField>
+
+<Warning>
+  **BE CAUTIOUS OF MAPPING THE RCON PORT EXTERNALLY** unless you are aware of all consequences and have set a **secure password**.
+</Warning>
+
+```yaml Using Docker Secrets
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    environment:
+      EULA: "TRUE"
+      RCON_PASSWORD_FILE: /run/secrets/rcon_pass
+    secrets:
+      - rcon_pass
+
+secrets:
+  rcon_pass:
+    file: ./rcon_password
+```
+
+### Query
+
+<ParamField path="ENABLE_QUERY" type="boolean" default="false">
+  Enable the gamespy query protocol
+</ParamField>
+
+<ParamField path="QUERY_PORT" type="number" default="25565">
+  Query port (UDP)
+</ParamField>
+
+### Game Settings
+
+<ParamField path="SEED" type="string">
+  Level seed for world generation. Quote negative values.
+</ParamField>
+
+<ParamField path="MODE" type="string" default="survival">
+  Game mode. Values: `creative`, `survival`, `adventure`, `spectator` (1.8+)
+</ParamField>
+
+<ParamField path="LEVEL" type="string" default="world">
+  World save name. Maps to `level-name` server property.
+</ParamField>
+
+<ParamField path="LEVEL_TYPE" type="string" default="default">
+  World generation type. See [Minecraft wiki](https://minecraft.wiki/w/Server.properties#level-type) for valid types.
+</ParamField>
+
+<ParamField path="GENERATOR_SETTINGS" type="json">
+  JSON configuration for world generation. Used with some level types like FLAT.
+</ParamField>
+
+```yaml Superflat Example
+environment:
+  LEVEL_TYPE: FLAT
+  GENERATOR_SETTINGS: >-
+    {
+        "layers": [
+            {"block": "minecraft:bedrock", "height": 1},
+            {"block": "minecraft:stone", "height": 2},
+            {"block": "minecraft:sandstone", "height": 15}
+        ],
+        "biome": "minecraft:desert"
+    }
+```
+
+### Server Icon
+
+<ParamField path="ICON" type="string">
+  URL or container path to server icon image. Automatically downloaded, scaled, and converted.
+</ParamField>
+
+<ParamField path="OVERRIDE_ICON" type="boolean" default="false">
+  Replace existing server-icon.png file
+</ParamField>
+
+### Resource Pack
+
+<ParamField path="RESOURCE_PACK" type="string">
+  URL to custom resource pack
+</ParamField>
+
+<ParamField path="RESOURCE_PACK_SHA1" type="string">
+  SHA1 checksum of the resource pack
+</ParamField>
+
+<ParamField path="RESOURCE_PACK_ENFORCE" type="boolean" default="false">
+  Enforce the resource pack on clients
+</ParamField>
+
+### Server Port
+
+<Warning>
+  Only change this if you know what you're doing. It's only needed with host-networking, which is rarely required. Use `-p` port mappings instead.
+</Warning>
+
+<ParamField path="SERVER_PORT" type="number" default="25565">
+  Server port. Maps to `server-port` property.
+</ParamField>
+
+### Datapacks
+
+<ParamField path="INITIAL_ENABLED_PACKS" type="string">
+  Comma separated list of datapacks to enable before initial world creation (1.19.3+)
+</ParamField>
+
+<ParamField path="INITIAL_DISABLED_PACKS" type="string">
+  Comma separated list of datapacks to disable before initial world creation (1.19.3+)
+</ParamField>
+
+### Custom Properties
+
+<ParamField path="CUSTOM_SERVER_PROPERTIES" type="string">
+  Newline delimited `name=value` pairs for custom server properties used by some mods/plugins
+</ParamField>
+
+```yaml Example
+environment:
+  CUSTOM_SERVER_PROPERTIES: |
+    custom1=value1
+    defaultworldgenerator-port=f8c04631-f744-11ec-b260-f02f74b094e0
+```
+
+## All Property Mappings
+
+<Warning>
+  Not all server properties are supported by all versions of Minecraft. Please consult the [server properties documentation](https://minecraft.wiki/w/Server.properties) for your version.
+</Warning>
+
+| Environment Variable | Server Property |
+|---------------------|----------------|
+| ACCEPTS_TRANSFERS | [accepts-transfers](https://minecraft.wiki/w/Server.properties#accepts-transfers) |
+| ALLOW_FLIGHT | [allow-flight](https://minecraft.wiki/w/Server.properties#allow-flight) |
+| ALLOW_NETHER | [allow-nether](https://minecraft.wiki/w/Server.properties#allow-nether) |
+| ANNOUNCE_PLAYER_ACHIEVEMENTS | [announce-player-achievements](https://minecraft.wiki/w/Server.properties#announce-player-achievements) |
+| BROADCAST_CONSOLE_TO_OPS | [broadcast-console-to-ops](https://minecraft.wiki/w/Server.properties#broadcast-console-to-ops) |
+| BROADCAST_RCON_TO_OPS | [broadcast-rcon-to-ops](https://minecraft.wiki/w/Server.properties#broadcast-rcon-to-ops) |
+| BUG_REPORT_LINK | [bug-report-link](https://minecraft.wiki/w/Server.properties#bug-report-link) |
+| ENABLE_COMMAND_BLOCK | [enable-command-block](https://minecraft.wiki/w/Server.properties#enable-command-block) |
+| ENABLE_STATUS | [enable-status](https://minecraft.wiki/w/Server.properties#enable-status) |
+| ENFORCE_SECURE_PROFILE | [enforce-secure-profile](https://minecraft.wiki/w/Server.properties#enforce-secure-profile) |
+| ENTITY_BROADCAST_RANGE_PERCENTAGE | [entity-broadcast-range-percentage](https://minecraft.wiki/w/Server.properties#entity-broadcast-range-percentage) |
+| FORCE_GAMEMODE | [force-gamemode](https://minecraft.wiki/w/Server.properties#force-gamemode) |
+| FUNCTION_PERMISSION_LEVEL | [function-permission-level](https://minecraft.wiki/w/Server.properties#function-permission-level) |
+| GENERATE_STRUCTURES | [generate-structures](https://minecraft.wiki/w/Server.properties#generate-structures) |
+| GENERATOR_SETTINGS | [generator-settings](https://minecraft.wiki/w/Server.properties#generator-settings) |
+| HARDCORE | [hardcore](https://minecraft.wiki/w/Server.properties#hardcore) |
+| HIDE_ONLINE_PLAYERS | [hide-online-players](https://minecraft.wiki/w/Server.properties#hide-online-players) |
+| LOG_IPS | [log-ips](https://minecraft.wiki/w/Server.properties#log-ips) |
+| MAX_BUILD_HEIGHT | [max-build-height](https://minecraft.wiki/w/Server.properties#max-build-height) |
+| MAX_CHAINED_NEIGHBOR_UPDATES | [max-chained-neighbor-updates](https://minecraft.wiki/w/Server.properties#max-chained-neighbor-updates) |
+| MAX_COMMAND_CHAIN_LENGTH | [max-command-chain-length](https://minecraft.wiki/w/Server.properties#max-command-chain-length) |
+| MAX_ENTITY_COLLISION_RADIUS | [max-entity-collision-radius](https://minecraft.wiki/w/Server.properties#max-entity-collision-radius) |
+| MAX_ENTITY_CRAMMING | [max-entity-cramming](https://minecraft.wiki/w/Server.properties#max-entity-cramming) |
+| MAX_FUNCTION_CHAIN_DEPTH | [max-function-chain-depth](https://minecraft.wiki/w/Server.properties#max-function-chain-depth) |
+| MAX_NEIGHBORS | [max-neighbors](https://minecraft.wiki/w/Server.properties#max-neighbors) |
+| MAX_PLAYERS | [max-players](https://minecraft.wiki/w/Server.properties#max-players) |
+| MAX_TICK_TIME | [max-tick-time](https://minecraft.wiki/w/Server.properties#max-tick-time) |
+| MAX_WORLD_SIZE | [max-world-size](https://minecraft.wiki/w/Server.properties#max-world-size) |
+| NETWORK_COMPRESSION_THRESHOLD | [network-compression-threshold](https://minecraft.wiki/w/Server.properties#network-compression-threshold) |
+| ONLINE_MODE | [online-mode](https://minecraft.wiki/w/Server.properties#online-mode) |
+| OP_PERMISSION_LEVEL | [op-permission-level](https://minecraft.wiki/w/Server.properties#op-permission-level) |
+| PAUSE_WHEN_EMPTY_SECONDS | [pause-when-empty-seconds](https://minecraft.wiki/w/Server.properties#pause-when-empty-seconds) |
+| PLAYER_IDLE_TIMEOUT | [player-idle-timeout](https://minecraft.wiki/w/Server.properties#player-idle-timeout) |
+| PREVENT_PROXY_CONNECTIONS | [prevent-proxy-connections](https://minecraft.wiki/w/Server.properties#prevent-proxy-connections) |
+| PVP | [pvp](https://minecraft.wiki/w/Server.properties#pvp) |
+| RATE_LIMIT | [rate-limit](https://minecraft.wiki/w/Server.properties#rate-limit) |
+| REGION_FILE_COMPRESSION | [region-file-compression](https://minecraft.wiki/w/Server.properties#region-file-compression) |
+| RESOURCE_PACK_ID | [resource-pack-id](https://minecraft.wiki/w/Server.properties#resource-pack-id) |
+| RESOURCE_PACK_PROMPT | [resource-pack-prompt](https://minecraft.wiki/w/Server.properties#resource-pack-prompt) |
+| SERVER_NAME | [server-name](https://minecraft.wiki/w/Server.properties#server-name) |
+| SIMULATION_DISTANCE | [simulation-distance](https://minecraft.wiki/w/Server.properties#simulation-distance) |
+| SNOOPER_ENABLED | [snooper-enabled](https://minecraft.wiki/w/Server.properties#snooper-enabled) |
+| SPAWN_ANIMALS | [spawn-animals](https://minecraft.wiki/w/Server.properties#spawn-animals) |
+| SPAWN_MONSTERS | [spawn-monsters](https://minecraft.wiki/w/Server.properties#spawn-monsters) |
+| SPAWN_NPCS | [spawn-npcs](https://minecraft.wiki/w/Server.properties#spawn-npcs) |
+| SPAWN_PROTECTION | [spawn-protection](https://minecraft.wiki/w/Server.properties#spawn-protection) |
+| STATUS_HEARTBEAT_INTERVAL | [status-heartbeat-interval](https://minecraft.wiki/w/Server.properties#status-heartbeat-interval) |
+| SYNC_CHUNK_WRITES | [sync-chunk-writes](https://minecraft.wiki/w/Server.properties#sync-chunk-writes) |
+| USE_NATIVE_TRANSPORT | [use-native-transport](https://minecraft.wiki/w/Server.properties#use-native-transport) |
+| VIEW_DISTANCE | [view-distance](https://minecraft.wiki/w/Server.properties#view-distance) |

@@ -1,0 +1,443 @@
+---
+title: Other Server Types
+description: Specialized and custom Minecraft server types including SpongeVanilla, Limbo, and more
+---
+
+Beyond the mainstream server types, the Docker Minecraft Server supports several specialized and custom server implementations for specific use cases.
+
+## SpongeVanilla
+
+SpongeVanilla is a community-driven platform that implements the Sponge API on vanilla Minecraft servers without requiring Forge.
+
+### Configuration
+
+```yaml
+environment:
+  TYPE: SPONGEVANILLA
+  VERSION: "1.12.2"
+```
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server:java8-multiarch
+    environment:
+      EULA: "TRUE"
+      TYPE: SPONGEVANILLA
+      VERSION: "1.12.2"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-sponge \
+  -e EULA=TRUE \
+  -e TYPE=SPONGEVANILLA \
+  -e VERSION=1.12.2 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server:java8-multiarch
+```
+</CodeGroup>
+
+### Version Selection
+
+By default, SpongeVanilla runs the latest `STABLE` version:
+
+```yaml
+environment:
+  TYPE: SPONGEVANILLA
+  # Uses latest STABLE by default
+```
+
+**Specific Version**:
+
+```yaml
+environment:
+  TYPE: SPONGEVANILLA
+  SPONGEVERSION: "1.11.2-6.1.0-BETA-19"
+```
+
+**Experimental Branch**:
+
+```yaml
+environment:
+  TYPE: SPONGEVANILLA
+  SPONGEBRANCH: EXPERIMENTAL
+```
+
+<Warning>
+  Current Sponge `STABLE` versions for Minecraft 1.12 require [Java 8 tag](https://hub.docker.com/r/itzg/minecraft-server/tags?name=java8):
+  
+  ```yaml
+  image: itzg/minecraft-server:java8-multiarch
+  ```
+</Warning>
+
+## Limbo
+
+Limbo is a lightweight, minimal server for maintaining player connections. Perfect for lobby servers or connection holding.
+
+### Configuration
+
+```yaml
+environment:
+  TYPE: LIMBO
+  LIMBO_BUILD: LATEST
+  LIMBO_SCHEMA_FILENAME: default.schem
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `LIMBO` |
+| `LIMBO_BUILD` | `LATEST` | Build number from [CI](https://ci.loohpjames.com/job/Limbo/) |
+| `FORCE_REDOWNLOAD` | `false` | Force re-download server JAR |
+| `LIMBO_SCHEMA_FILENAME` | `default.schem` | Schematic file for world |
+| `LEVEL` | `Default;${LIMBO_SCHEMA_NAME}` | Level configuration |
+
+<Note>
+  The `VERSION` variable is ignored for Limbo. Find the appropriate build number from the [CI page](https://ci.loohpjames.com/job/Limbo/) to match your client version.
+</Note>
+
+### MOTD Configuration
+
+Limbo requires JSON chat format instead of format codes:
+
+```yaml
+environment:
+  TYPE: LIMBO
+  MOTD: '{"text":"Welcome to Limbo","color":"gold"}'
+```
+
+If you provide a plain string, it will be automatically converted to JSON format.
+
+### Complete Example
+
+```yaml docker-compose.yml
+services:
+  limbo:
+    image: itzg/minecraft-server
+    container_name: minecraft-limbo
+    
+    environment:
+      EULA: "TRUE"
+      TYPE: LIMBO
+      LIMBO_BUILD: LATEST
+      
+      # Limbo-specific settings
+      LIMBO_SCHEMA_FILENAME: lobby.schem
+      
+      MOTD: '{"text":"Lobby Server","color":"aqua"}'
+      MAX_PLAYERS: 100
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./limbo-data:/data
+```
+
+## NanoLimbo
+
+An alternative lightweight Limbo server implementation.
+
+```yaml
+environment:
+  TYPE: NANOLIMBO
+```
+
+<Note>
+  NanoLimbo is a fork of the original Limbo by Nan1t, now maintained by BoomEaro. Configuration is similar to standard Limbo.
+</Note>
+
+## Crucible
+
+Crucible is a legacy server for Minecraft 1.7.10 combining Forge and Bukkit.
+
+### Configuration
+
+```yaml
+environment:
+  TYPE: CRUCIBLE
+  VERSION: "1.7.10"
+  CRUCIBLE_RELEASE: latest
+```
+
+<Warning>
+  Crucible is only available for Minecraft 1.7.10. Ensure you set `VERSION: "1.7.10"`.
+</Warning>
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `CRUCIBLE` |
+| `VERSION` | - | Must be `1.7.10` |
+| `CRUCIBLE_RELEASE` | `latest` | Specific Crucible release version |
+
+### Complete Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server:java8-multiarch
+    container_name: minecraft-crucible
+    
+    environment:
+      EULA: "TRUE"
+      TYPE: CRUCIBLE
+      VERSION: "1.7.10"
+      CRUCIBLE_RELEASE: latest
+      
+      MEMORY: 4G
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./plugins:/data/plugins
+```
+
+## Custom Server
+
+Run a completely custom server JAR or class files.
+
+### Using Custom JAR File
+
+<CodeGroup>
+```yaml From URL
+environment:
+  TYPE: CUSTOM
+  CUSTOM_SERVER: "https://your-server.com/custom-server.jar"
+```
+
+```yaml From File Path
+environment:
+  TYPE: CUSTOM
+  CUSTOM_SERVER: "/data/custom-server.jar"
+volumes:
+  - ./custom-server.jar:/data/custom-server.jar
+```
+</CodeGroup>
+
+### Using Custom Main Class
+
+Replace the `-jar` invocation with a custom classpath and main class:
+
+```yaml
+environment:
+  TYPE: CUSTOM
+  CUSTOM_JAR_EXEC: "-cp worldedit.jar:Carpet-Server.jar net.minecraft.server.MinecraftServer"
+```
+
+<Note>
+  When using `docker run`, quote the entire value:
+  
+  ```bash
+  -e CUSTOM_JAR_EXEC="-cp worldedit.jar:Carpet-Server.jar net.minecraft.server.MinecraftServer"
+  ```
+</Note>
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `CUSTOM` |
+| `CUSTOM_SERVER` | - | URL or path to custom server JAR |
+| `CUSTOM_JAR_EXEC` | - | Custom Java execution arguments |
+
+### Complete Examples
+
+<CodeGroup>
+```yaml Custom JAR from URL
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: CUSTOM
+      CUSTOM_SERVER: "https://cdn.example.com/my-server.jar"
+      VERSION: "1.20.4"
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+```yaml Custom Main Class
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: CUSTOM
+      CUSTOM_JAR_EXEC: "-cp worldedit.jar:server.jar net.minecraft.server.Main"
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+      - ./worldedit.jar:/data/worldedit.jar
+      - ./server.jar:/data/server.jar
+```
+
+```yaml Pre-downloaded JAR
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: CUSTOM
+      CUSTOM_SERVER: "/data/my-custom-server.jar"
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+      - ./my-custom-server.jar:/data/my-custom-server.jar
+```
+</CodeGroup>
+
+## Use Cases
+
+### SpongeVanilla
+- Running Sponge plugins without Forge
+- Vanilla server with plugin capabilities
+- Lightweight plugin platform
+
+### Limbo/NanoLimbo
+- Lobby servers for networks
+- AFK/holding servers
+- Minimal resource placeholder servers
+- Connection management
+
+### Crucible
+- Legacy 1.7.10 modded servers
+- Forge mods + Bukkit plugins on 1.7.10
+- Maintaining old modpacks
+
+### Custom
+- Experimental server implementations
+- Custom-built server software
+- Unreleased or private server builds
+- Educational/development purposes
+
+## Troubleshooting
+
+### SpongeVanilla Java Version
+
+**Problem**: SpongeVanilla won't start
+
+**Solution**: Use Java 8 image for Minecraft 1.12:
+
+```yaml
+image: itzg/minecraft-server:java8-multiarch
+```
+
+### Limbo MOTD Format
+
+**Problem**: MOTD not displaying correctly
+
+**Solution**: Use JSON chat format:
+
+```yaml
+MOTD: '{"text":"Server Name","color":"blue"}'
+```
+
+### Custom Server Not Starting
+
+**Problem**: Custom server JAR fails to launch
+
+**Solution**: 
+1. Verify JAR file path is correct
+2. Check JAR file is not corrupted
+3. Ensure proper Java version
+4. Review server logs for specific errors
+
+### Crucible Version Mismatch
+
+**Problem**: Crucible won't start
+
+**Solution**: Ensure version is set to 1.7.10:
+
+```yaml
+environment:
+  VERSION: "1.7.10"
+```
+
+## Performance Considerations
+
+### Limbo Servers
+
+Limbo servers are extremely lightweight:
+
+```yaml
+environment:
+  MEMORY: 512M  # Limbo requires minimal resources
+```
+
+### SpongeVanilla
+
+Moderate resource usage:
+
+```yaml
+environment:
+  MEMORY: 2G  # For small servers
+```
+
+### Crucible
+
+Higher resources needed (mods + plugins):
+
+```yaml
+environment:
+  MEMORY: 6G  # Hybrid server requirements
+```
+
+## Migration and Compatibility
+
+### From Vanilla to SpongeVanilla
+
+```yaml
+environment:
+  TYPE: SPONGEVANILLA  # Changed from VANILLA
+  VERSION: "1.12.2"
+```
+
+Worlds are compatible - just change the type.
+
+### From Other Types to Custom
+
+Custom type can run almost any server JAR:
+
+```yaml
+environment:
+  TYPE: CUSTOM
+  CUSTOM_SERVER: "path/to/any-server.jar"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vanilla Server" icon="cube" href="/server-types/vanilla">
+    Return to standard vanilla server
+  </Card>
+  <Card title="Paper Server" icon="file-lines" href="/server-types/paper">
+    Upgrade to high-performance Paper
+  </Card>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Combine mods and plugins
+  </Card>
+  <Card title="Server Configuration" icon="gear" href="/configuration/server-properties">
+    Configure server properties
+  </Card>
+</CardGroup>

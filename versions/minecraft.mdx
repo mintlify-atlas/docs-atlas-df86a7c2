@@ -1,0 +1,103 @@
+---
+title: Minecraft Version Selection
+description: Configure the Minecraft server version using the VERSION environment variable
+---
+
+The `VERSION` environment variable controls which Minecraft server version is installed and run. This variable is case-sensitive and supports multiple version types.
+
+## Version Types
+
+The `VERSION` variable accepts the following values:
+
+- `LATEST` - Latest stable release (default)
+- `SNAPSHOT` - Latest snapshot version
+- Specific version number (e.g., `1.7.9`, `25w35a`, `26.1`, `26.1-snapshot-1`)
+- Alpha/beta versions (e.g., `b1.7.3`)
+
+<Note>
+  When using alpha or beta versions, the server download might not exist for all versions.
+</Note>
+
+## Setting the Version
+
+<CodeGroup>
+```bash Latest Snapshot
+docker run -d -e VERSION=SNAPSHOT \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+```bash Specific Version
+docker run -d -e VERSION=1.7.9 \
+  -e EULA=TRUE \
+  itzg/minecraft-server
+```
+
+```yaml Docker Compose
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.1"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+</CodeGroup>
+
+## Automatic Updates
+
+When using `LATEST` or `SNAPSHOT`, the server automatically upgrades when a newer version is available:
+
+<Steps>
+  <Step title="Stop the container">
+    Stop the running Minecraft server container.
+  </Step>
+  
+  <Step title="Restart the container">
+    Restart the container to trigger the version check.
+  </Step>
+  
+  <Step title="Download occurs">
+    If a newer version is available from the respective release channel, the new server jar file is automatically downloaded and used.
+  </Step>
+</Steps>
+
+## Version Examples
+
+| Version Type | Example Value | Description |
+|--------------|---------------|-------------|
+| Latest release | `LATEST` | Most recent stable version |
+| Latest snapshot | `SNAPSHOT` | Most recent development snapshot |
+| Specific release | `1.20.4` | Exact release version |
+| Snapshot | `25w35a` | Specific snapshot build |
+| Modded version | `26.1` | Forge/Fabric version number |
+| Beta version | `b1.7.3` | Classic beta version |
+
+## Managing Old Server Jars
+
+<Note>
+  Over time, older versions of the server jar may accumulate in the `/data` directory. It is safe to remove these old jar files manually.
+</Note>
+
+When upgrading versions, the container preserves old jar files. You can clean them up:
+
+```bash
+# Enter the container
+docker exec -it mc bash
+
+# Remove old server jars (keep the current one)
+cd /data
+ls -lt *.jar
+# Manually remove old versions
+```
+
+## Version Compatibility
+
+Different Minecraft versions require different Java versions. See the [Java Version Selection](/versions/java) page for compatibility information.
+
+<Warning>
+  Always check that your chosen Minecraft version is compatible with the Java version in your container image tag. Mismatched versions will cause startup failures.
+</Warning>

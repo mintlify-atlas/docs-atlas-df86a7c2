@@ -1,0 +1,203 @@
+---
+title: Java Version Selection
+description: Select the appropriate Java version using Docker image tags for Minecraft compatibility
+---
+
+The Java version used by the Minecraft server is determined by the Docker image tag you choose. Different Minecraft versions require different Java versions to run properly.
+
+## Image Tags
+
+Image references can either omit the tag (which defaults to `latest`) or explicitly specify a tag:
+
+```bash
+# Using default 'latest' tag (Java 25)
+itzg/minecraft-server
+
+# Using explicit tag
+itzg/minecraft-server:java21
+```
+
+## Available Java Versions
+
+| Tag | Java Version | Linux | JVM Type | Architecture | Notes |
+|-----|--------------|-------|----------|--------------|-------|
+| `latest` | 25 | Ubuntu | Hotspot | amd64, arm64 | Default |
+| `stable` | 25 | Ubuntu | Hotspot | amd64, arm64 | Most recent release |
+| `java25` | 25 | Ubuntu | Hotspot | amd64, arm64 | |
+| `java25-jdk` | 25 | Ubuntu | Hotspot+JDK | amd64, arm64 | |
+| `java25-graalvm` | 25 | Oracle | Oracle GraalVM | amd64, arm64 | |
+| `java21` | 21 | Ubuntu | Hotspot | amd64, arm64 | |
+| `java21-jdk` | 21 | Ubuntu | Hotspot+JDK | amd64, arm64 | |
+| `java21-alpine` | 21 | Alpine | Hotspot | amd64, arm64 | |
+| `java21-graalvm` | 21 | Oracle | Oracle GraalVM | amd64, arm64 | |
+| `java17` | 17 | Ubuntu | Hotspot | amd64, arm64, armv7 | |
+| `java17-graalvm` | 17 | Oracle | Oracle GraalVM | amd64, arm64 | |
+| `java11` | 11 | Ubuntu | Hotspot | amd64, arm64, armv7 | |
+| `java8` | 8 | Ubuntu | Hotspot | amd64, arm64, armv7 | |
+
+<Note>
+  The `latest` tag shifts to include not only the latest features and bug fixes, but also the latest Java version that Mojang requires for the latest Minecraft version.
+</Note>
+
+## Usage Examples
+
+<CodeGroup>
+```bash Docker Run - Java 8
+docker run -it -e EULA=TRUE itzg/minecraft-server:java8
+```
+
+```bash Docker Run - Java 21
+docker run -it -e EULA=TRUE itzg/minecraft-server:java21
+```
+
+```yaml Docker Compose
+services:
+  mc:
+    image: itzg/minecraft-server:java17
+    environment:
+      EULA: "TRUE"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+</CodeGroup>
+
+## Version Compatibility
+
+Refer to the [Minecraft Wiki's Java update guide](https://minecraft.wiki/w/Tutorials/Update_Java#Why_update?) for the required Java version for each vanilla Minecraft version.
+
+### Common Compatibility Issues
+
+#### Class File Version 65.0
+
+If you encounter this error, you need Java 21 or later:
+
+```
+Exception in thread "ServerMain" java.lang.UnsupportedClassVersionError: 
+org/bukkit/craftbukkit/Main has been compiled by a more recent version of 
+the Java Runtime (class file version 65.0)
+```
+
+<Warning>
+  Ensure you have pulled the latest image or explicitly use the `java21` tag.
+</Warning>
+
+**Solution:**
+
+```bash
+# Re-pull the latest image
+docker pull itzg/minecraft-server:java21
+
+# Or use explicit tag
+docker run -d -e EULA=TRUE itzg/minecraft-server:java21
+```
+
+#### Forge Compatibility Issues
+
+Forge and its mods sometimes use non-public Java APIs and can break with newer Java versions.
+
+**Java 21 Issues:**
+
+Some mods for Minecraft 1.21 require Java 17. If you see:
+
+```
+Caused by: org.spongepowered.asm.mixin.throwables.ClassMetadataNotFoundException: java.util.List
+```
+
+Use the Java 17 image:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:java17
+```
+
+**Java 8 Required:**
+
+For Forge versions less than 1.18, you must use `java8`:
+
+```
+Caused by: java.lang.ClassCastException: class jdk.internal.loader.ClassLoaders$AppClassLoader 
+   cannot be cast to class java.net.URLClassLoader
+```
+
+**Solution:**
+
+```bash
+docker run -d -e EULA=TRUE itzg/minecraft-server:java8
+```
+
+<Note>
+  Forge does not support the OpenJ9 JVM implementation.
+</Note>
+
+## Release Versions
+
+You can pin a specific build of the image using release tags:
+
+```
+itzg/minecraft-server:<release>-<java-tag>
+```
+
+Example:
+
+```bash
+# Pin to the 2024.4.0 release with Java 17
+docker run -d itzg/minecraft-server:2024.4.0-java17
+```
+
+See [GitHub releases](https://github.com/itzg/docker-minecraft-server/releases) for available versions.
+
+## Stable Image Tag
+
+The `stable` tag combines benefits of `latest` and release versions:
+
+```bash
+# Always uses the most recently released version
+docker run -d itzg/minecraft-server:stable
+
+# Per-variant stable tags
+docker run -d itzg/minecraft-server:stable-java17
+```
+
+## GraalVM Images
+
+GraalVM images are based on [Oracle GraalVM](https://blogs.oracle.com/java/post/new-oracle-graalvm-container-images) and use the [GraalVM Free License](https://blogs.oracle.com/java/post/graalvm-free-license).
+
+<Warning>
+  GraalVM images use Oracle Linux (based on RHEL). The Forge Installer will not work due to zlib-ng compatibility issues. Use standard images for initial Forge installation and version upgrades.
+</Warning>
+
+## Alpine Images
+
+Alpine-based images provide a smaller footprint:
+
+```bash
+docker run -d itzg/minecraft-server:java21-alpine
+```
+
+<Note>
+  Alpine images for Java 17 do not include arm64 architecture because the base Eclipse Temurin images don't provide that combination. Use Ubuntu-based images instead.
+</Note>
+
+## Troubleshooting
+
+### Class File Version Errors
+
+If you see "class file version" errors, refer to the [Java bytecode version table](https://javaalmanac.io/bytecode/versions/) to identify the required JDK version.
+
+| Class File Version | Java Version |
+|--------------------|-------------|
+| 65.0 | Java 21 |
+| 61.0 | Java 17 |
+| 55.0 | Java 11 |
+| 52.0 | Java 8 |
+
+## Programmatic Access
+
+Image tag information is available in JSON format:
+
+```bash
+curl https://raw.githubusercontent.com/itzg/docker-minecraft-server/refs/heads/master/images.json
+```

@@ -1,0 +1,458 @@
+---
+title: Paper Server
+description: High-performance Minecraft server with extensive optimizations and plugin support
+---
+
+Paper is a high-performance fork of Spigot that provides significant performance improvements, bug fixes, and additional features while maintaining full compatibility with Spigot and Bukkit plugins.
+
+## Overview
+
+PaperMC is one of the most popular Minecraft server platforms, offering:
+
+- **Superior Performance**: Extensive optimizations for better TPS and lower resource usage
+- **Active Development**: Regular updates and quick bug fixes
+- **Plugin Compatibility**: Full support for Bukkit and Spigot plugins
+- **Advanced Configuration**: Fine-grained control over server behavior
+- **Production Ready**: Used by thousands of servers worldwide
+
+<Note>
+  Paper is recommended over Vanilla, Bukkit, or Spigot for most use cases due to its performance improvements and active maintenance.
+</Note>
+
+## Configuration
+
+### Basic Setup
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-paper \
+  -e EULA=TRUE \
+  -e TYPE=PAPER \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+## Version Selection
+
+### Automatic Latest Version
+
+By default, the container downloads the latest Paper build for your specified `VERSION`:
+
+```yaml
+environment:
+  TYPE: PAPER
+  VERSION: "1.20.4"  # Latest Paper build for 1.20.4
+```
+
+If `VERSION` is not specified, the latest Minecraft version released by PaperMC is used.
+
+### Specific Paper Build
+
+Select a specific Paper build number:
+
+```yaml
+environment:
+  TYPE: PAPER
+  VERSION: "1.20.6"
+  PAPER_BUILD: "140"
+```
+
+### Experimental Builds
+
+Access experimental/snapshot builds:
+
+```yaml
+environment:
+  TYPE: PAPER
+  VERSION: "1.21"
+  PAPER_CHANNEL: experimental
+```
+
+<Warning>
+  If you see the error `No build found for version X with channel 'default'`, set `PAPER_CHANNEL: experimental` to access pre-release builds.
+</Warning>
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `PAPER` |
+| `VERSION` | latest | Minecraft version (e.g., `1.20.4`) |
+| `PAPER_BUILD` | latest | Specific Paper build number |
+| `PAPER_CHANNEL` | `default` | Build channel: `default` or `experimental` |
+| `PAPER_DOWNLOAD_URL` | - | Custom Paper download URL |
+| `SKIP_DOWNLOAD_DEFAULTS` | `false` | Skip downloading default config files |
+
+## Plugin Management
+
+### Installing Plugins
+
+Paper supports Bukkit and Spigot plugins. Install them in several ways:
+
+<Steps>
+  <Step title="Plugins Directory">
+    Place plugin JAR files in the `plugins` subdirectory:
+    
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./plugins:/data/plugins
+    ```
+    
+    Then add your `.jar` files to `./plugins/` on the host.
+  </Step>
+  
+  <Step title="Dedicated Plugins Volume">
+    Use a dedicated volume for plugins:
+    
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./plugins:/plugins
+    ```
+  </Step>
+  
+  <Step title="Auto-Download with Spiget">
+    Automatically download plugins from SpigotMC:
+    
+    ```yaml
+    environment:
+      SPIGET_RESOURCES: "1234,5678"
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  If you add plugins while the container is running, restart it to load them:
+  
+  ```bash
+  docker restart minecraft-paper
+  ```
+</Note>
+
+### Plugin Configuration
+
+Plugin configurations are stored in:
+- `./data/plugins/<plugin-name>/config.yml`
+- `./data/plugins/<plugin-name>/`
+
+Mount these directories to persist plugin data:
+
+```yaml
+volumes:
+  - ./data:/data
+```
+
+## Paper Configuration
+
+### Configuration Files
+
+Paper uses several configuration files:
+
+- `paper-global.yml` - Global Paper settings
+- `paper-world-defaults.yml` - Default world settings
+- `paper-world/world.yml` - Per-world settings
+- `spigot.yml` - Spigot settings
+- `bukkit.yml` - Bukkit settings
+
+### Configuration Repositories
+
+Automatically download optimized configurations:
+
+```yaml
+environment:
+  TYPE: PAPER
+  VERSION: "1.20.4"
+  PAPER_CONFIG_REPO: "https://your-repo.com/configs"
+  SERVER_PROPERTIES_REPO_URL: "https://your-repo.com/configs"
+```
+
+The container appends the Minecraft version to the URL:
+- `<REPO_URL>/1.20.4/paper-global.yml`
+- `<REPO_URL>/1.20.4/server.properties`
+
+<Note>
+  Environment variables in your Docker configuration will override values in downloaded `server.properties` files.
+</Note>
+
+## Paper Alternatives
+
+The Paper ecosystem includes several enhanced forks:
+
+### Pufferfish
+
+Highly optimized Paper fork for large servers:
+
+```yaml
+environment:
+  TYPE: PUFFERFISH
+  VERSION: "1.18"  # Branch: latest, 1.18, or 1.17
+  PUFFERFISH_BUILD: "47"  # Specific build number
+  USE_FLARE_FLAGS: "false"  # Enable Flare profiler
+```
+
+<Warning>
+  For Pufferfish, `VERSION` selects the branch. Use `PUFFERFISH_BUILD` to select the actual server version.
+</Warning>
+
+### Purpur
+
+Paper fork with additional gameplay features:
+
+```yaml
+environment:
+  TYPE: PURPUR
+  VERSION: "1.20.4"
+  PURPUR_BUILD: "LATEST"  # Or specific build number
+  PURPUR_DOWNLOAD_URL: ""  # Optional custom URL
+  USE_FLARE_FLAGS: "false"
+```
+
+### Leaf
+
+Paper fork focused on performance and low-level optimizations:
+
+```yaml
+environment:
+  TYPE: LEAF
+  VERSION: "1.21.4"
+  LEAF_BUILD: "441"  # Optional specific build
+```
+
+### Folia
+
+Experimental multi-threaded Paper fork:
+
+```yaml
+environment:
+  TYPE: FOLIA
+  VERSION: "1.20.4"
+  FOLIA_BUILD: "26"  # Optional specific build
+  FOLIA_CHANNEL: "experimental"
+  FOLIA_DOWNLOAD_URL: ""  # Optional custom URL
+```
+
+<Warning>
+  Folia is experimental and not all plugins are compatible with its multi-threaded architecture. The Folia type inherits Paper's variables, which will override Folia-specific ones.
+</Warning>
+
+## Advanced Configuration
+
+### Custom Download URL
+
+Host your own Paper builds:
+
+```yaml
+environment:
+  TYPE: PAPER
+  PAPER_DOWNLOAD_URL: "https://your-server.com/paper-1.20.4-140.jar"
+```
+
+### Force Re-download
+
+Force re-downloading the server jar:
+
+```yaml
+environment:
+  FORCE_REDOWNLOAD: "true"
+```
+
+<Note>
+  Remove `FORCE_REDOWNLOAD` after successfully starting the server.
+</Note>
+
+### Skip Default Configs
+
+Skip downloading default configuration files:
+
+```yaml
+environment:
+  SKIP_DOWNLOAD_DEFAULTS: "true"
+```
+
+## Complete Production Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-paper
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.20.4"
+      PAPER_CHANNEL: "default"
+      
+      # Server Settings
+      MOTD: "A Paper Minecraft Server"
+      DIFFICULTY: normal
+      MODE: survival
+      MAX_PLAYERS: 50
+      VIEW_DISTANCE: 10
+      SIMULATION_DISTANCE: 8
+      
+      # Performance
+      MEMORY: 6G
+      USE_AIKAR_FLAGS: "true"
+      
+      # Plugins
+      SPIGET_RESOURCES: "1234,5678"  # Auto-download plugins
+      
+      # Network
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "your-secure-password"
+      RCON_PORT: 25575
+      
+      # World
+      LEVEL: "world"
+      SEED: "paper-world"
+      
+      # Security
+      ENABLE_WHITELIST: "true"
+      ENFORCE_WHITELIST: "true"
+      ONLINE_MODE: "true"
+    
+    ports:
+      - "25565:25565"
+      - "25575:25575"  # RCON
+    
+    volumes:
+      - ./data:/data
+      - ./plugins:/plugins
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Performance Tuning
+
+### Recommended Memory Settings
+
+```yaml
+environment:
+  MEMORY: 6G  # For 20-50 players
+  USE_AIKAR_FLAGS: "true"  # Optimized JVM flags
+```
+
+### Player Count Guidelines
+
+| Players | Recommended RAM | View Distance |
+|---------|----------------|---------------|
+| 1-10 | 2-4GB | 10-12 |
+| 10-20 | 4-6GB | 8-10 |
+| 20-50 | 6-8GB | 6-8 |
+| 50+ | 8GB+ | 4-6 |
+
+### Paper-Specific Optimizations
+
+Edit `paper-global.yml` for performance tuning:
+
+```yaml
+volumes:
+  - ./config/paper-global.yml:/data/config/paper-global.yml
+```
+
+Common optimizations:
+- Chunk loading limits
+- Entity activation ranges
+- Tick limits
+- Redstone optimizations
+
+## Troubleshooting
+
+### Build Not Found Error
+
+```
+No build found for version 1.21 with channel 'default'
+```
+
+**Solution**: Use experimental channel:
+
+```yaml
+environment:
+  PAPER_CHANNEL: experimental
+```
+
+### Plugin Not Loading
+
+1. Check plugin compatibility with your Paper version
+2. Verify JAR file is in the correct directory
+3. Check server logs for errors
+4. Restart the container after adding plugins
+
+### Performance Issues
+
+1. Increase allocated memory
+2. Enable Aikar's flags: `USE_AIKAR_FLAGS: "true"`
+3. Reduce view distance and simulation distance
+4. Optimize Paper configuration files
+5. Review plugin performance with `/timings`
+
+## Migration Guide
+
+### From Vanilla/Spigot to Paper
+
+<Steps>
+  <Step title="Backup your server">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Update configuration">
+    ```yaml
+    environment:
+      TYPE: PAPER  # Changed from VANILLA/SPIGOT
+      VERSION: "1.20.4"
+    ```
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Paper will automatically convert your world.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Install Plugins" icon="plug" href="/mods-and-plugins/overview">
+    Add plugins to extend functionality
+  </Card>
+  <Card title="Spiget Auto-Download" icon="download" href="/mods-and-plugins/spiget">
+    Automatically download plugins
+  </Card>
+  <Card title="Performance Tuning" icon="gauge-high" href="/configuration/performance">
+    Optimize for better performance
+  </Card>
+  <Card title="Hybrid Servers" icon="code-merge" href="/server-types/hybrids">
+    Run mods and plugins together
+  </Card>
+</CardGroup>

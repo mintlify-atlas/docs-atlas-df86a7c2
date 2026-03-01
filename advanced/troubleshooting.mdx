@@ -1,0 +1,158 @@
+---
+title: Troubleshooting
+description: Debug and troubleshoot common issues with your Minecraft server container
+---
+
+This guide helps you diagnose and resolve common issues when running the Minecraft server container.
+
+## Debug Environment Variables
+
+Enable detailed logging to troubleshoot container initialization and startup issues.
+
+### General Debug Mode
+
+Set `DEBUG` to `true` to enable verbose logging for the entire container initialization process. This is especially useful when server files are pre-downloaded or when reporting issues.
+
+```yaml
+environment:
+  DEBUG: "true"
+```
+
+<Note>
+When reporting [issues on GitHub](https://github.com/itzg/docker-minecraft-server/issues), it is highly recommended to include the debug output.
+</Note>
+
+### Debug Server Execution
+
+To troubleshoot only the command-line used to start the Minecraft server:
+
+```yaml
+environment:
+  DEBUG_EXEC: "true"
+```
+
+### Debug Memory Allocation
+
+To troubleshoot JVM memory allocation issues:
+
+```yaml
+environment:
+  DEBUG_MEMORY: "true"
+```
+
+## Common Issues and Solutions
+
+<Accordion title="Ownership/Permission Issues">
+If you are experiencing issues with the "Changing ownership of /data" step, you can disable it:
+
+```yaml
+environment:
+  SKIP_CHOWN_DATA: "true"
+```
+
+<Warning>
+Disabling ownership changes may cause permission issues if your container runs as a different user than the host file owner.
+</Warning>
+</Accordion>
+
+<Accordion title="Raspberry Pi: 'sleep: cannot read realtime clock' Error">
+If you see the error "sleep: cannot read realtime clock: Operation not permitted" on a Raspberry Pi:
+
+<Steps>
+  <Step title="Update libseccomp on host">
+    Ensure `libseccomp` is up to date on your host system.
+  </Step>
+  
+  <Step title="Add SELinux flag if needed">
+    In some cases, adding the `:Z` flag to the `/data` mount may be needed:
+    
+    ```yaml
+    volumes:
+      - ./data:/data:Z
+    ```
+    
+    <Warning>
+    Use the `:Z` flag cautiously. See [Docker SELinux documentation](https://docs.docker.com/storage/bind-mounts/#configure-the-selinux-label) for details.
+    </Warning>
+  </Step>
+</Steps>
+</Accordion>
+
+<Accordion title="Container Won't Start or Crashes">
+<Steps>
+  <Step title="Enable debug mode">
+    Set `DEBUG=true` to see detailed startup logs.
+  </Step>
+  
+  <Step title="Check memory allocation">
+    Ensure you have allocated enough memory. Use `DEBUG_MEMORY=true` to see memory-related issues.
+  </Step>
+  
+  <Step title="Verify image version">
+    Confirm you're running the expected image version using the commands below.
+  </Step>
+  
+  <Step title="Check logs">
+    Review container logs for error messages:
+    
+    ```bash
+    docker logs <container-name>
+    ```
+  </Step>
+</Steps>
+</Accordion>
+
+## Verifying Image Version
+
+To confirm the image version that has been pulled, use the following command:
+
+```bash
+docker image inspect itzg/minecraft-server -f "{{json .Config.Labels}}"
+```
+
+Example output:
+
+```json
+{
+  "org.opencontainers.image.authors": "... <...@gmail.com>",
+  "org.opencontainers.image.created": "2025-04-03T02:15:51.405Z",
+  "org.opencontainers.image.description": "Docker image that provides a Minecraft Server for Java Edition that automatically downloads selected version at startup",
+  "org.opencontainers.image.licenses": "Apache-2.0",
+  "org.opencontainers.image.ref.name": "ubuntu",
+  "org.opencontainers.image.revision": "d6897a649ecbc16b5fb2e1500e24b64ef80270a0",
+  "org.opencontainers.image.source": "https://github.com/itzg/docker-minecraft-server",
+  "org.opencontainers.image.title": "docker-minecraft-server",
+  "org.opencontainers.image.url": "https://github.com/itzg/docker-minecraft-server",
+  "org.opencontainers.image.version": "java21"
+}
+```
+
+### Important Labels
+
+The most interesting labels for troubleshooting:
+
+- **`org.opencontainers.image.created`**: The date/time the image was built
+- **`org.opencontainers.image.revision`**: Git commit hash (maps to `https://github.com/itzg/docker-minecraft-server/commit/REVISION`)
+- **`org.opencontainers.image.version`**: Image tag and Java variant
+
+## Getting Help
+
+<Steps>
+  <Step title="Gather information">
+    - Enable debug mode and collect logs
+    - Note your image version and revision
+    - Document your environment variables and configuration
+  </Step>
+  
+  <Step title="Search existing issues">
+    Check if your issue has already been reported on [GitHub Issues](https://github.com/itzg/docker-minecraft-server/issues).
+  </Step>
+  
+  <Step title="Report the issue">
+    If you can't find a solution, [create a new issue](https://github.com/itzg/docker-minecraft-server/issues/new) with:
+    - Debug logs
+    - Image version and labels
+    - Your configuration (docker-compose.yml or docker run command)
+    - Steps to reproduce the issue
+  </Step>
+</Steps>

@@ -1,0 +1,374 @@
+---
+title: Bukkit/Spigot Servers
+description: Classic plugin-based Minecraft servers (Paper recommended as modern alternative)
+---
+
+Bukkit and Spigot are classic Minecraft server platforms that introduced plugin support to the Minecraft server ecosystem. While historically important, they have largely been superseded by Paper.
+
+<Warning>
+  The GetBukkit download provider no longer supports automated downloads. It is **highly recommended** to use [Paper](/server-types/paper) instead, which is actively maintained, fully compatible with Bukkit/Spigot plugins, and offers significantly better performance.
+</Warning>
+
+## Overview
+
+Bukkit/Spigot servers provide:
+
+- **Plugin Support**: Run Bukkit/Spigot plugins for customization
+- **Legacy Compatibility**: Support for older plugins and configurations
+- **Established Ecosystem**: Large library of plugins available
+
+### Why Choose Paper Instead?
+
+Paper is a drop-in replacement that offers:
+- Active development and maintenance
+- Significant performance improvements
+- Full Bukkit/Spigot plugin compatibility
+- Quick bug fixes and updates
+- Better security
+
+<Note>
+  Unless you have a specific reason to use Bukkit/Spigot (such as legacy compatibility), use [Paper](/server-types/paper) instead.
+</Note>
+
+## Configuration
+
+### Spigot Server
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: SPIGOT
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-spigot \
+  -e EULA=TRUE \
+  -e TYPE=SPIGOT \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+### Bukkit Server
+
+```yaml
+environment:
+  TYPE: BUKKIT
+  VERSION: "1.20.4"
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TYPE` | - | Set to `BUKKIT` or `SPIGOT` |
+| `VERSION` | latest | Minecraft version |
+| `BUKKIT_DOWNLOAD_URL` | - | Custom Bukkit download URL |
+| `SPIGOT_DOWNLOAD_URL` | - | Custom Spigot download URL |
+| `FORCE_REDOWNLOAD` | `false` | Force re-download if JAR is corrupted |
+| `BUILD_FROM_SOURCE` | `false` | Build Spigot from source |
+
+## Version Selection
+
+<Warning>
+  Some VERSION values require exact naming. For example, "1.8" is not sufficient - you need the exact version like `1.8-R0.1-SNAPSHOT-latest`. Check the Bukkit/Spigot download page for exact version strings.
+</Warning>
+
+### Specific Version
+
+```yaml
+environment:
+  TYPE: SPIGOT
+  VERSION: "1.8-R0.1-SNAPSHOT-latest"
+```
+
+## Custom Download URLs
+
+Since automated downloads are limited, you can host your own server JARs:
+
+```yaml
+environment:
+  TYPE: SPIGOT
+  SPIGOT_DOWNLOAD_URL: "https://your-server.com/spigot-1.20.4.jar"
+```
+
+For Bukkit:
+
+```yaml
+environment:
+  TYPE: BUKKIT
+  BUKKIT_DOWNLOAD_URL: "https://your-server.com/bukkit-1.20.4.jar"
+```
+
+## Building from Source
+
+You can build Spigot from source:
+
+```yaml
+environment:
+  TYPE: SPIGOT
+  VERSION: "1.20.4"
+  BUILD_FROM_SOURCE: "true"
+```
+
+<Note>
+  Building from source takes significantly longer during initial startup but ensures you have the latest build.
+</Note>
+
+## Plugin Management
+
+Bukkit/Spigot plugins work the same way as Paper plugins:
+
+### Manual Installation
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./plugins:/data/plugins
+```
+
+Place plugin JAR files in `./plugins/`.
+
+### Auto-Download with Spiget
+
+```yaml
+environment:
+  TYPE: SPIGOT
+  SPIGET_RESOURCES: "1234,5678"
+```
+
+### Dedicated Plugins Volume
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./plugins:/plugins
+```
+
+## Legacy Alternatives
+
+These are specialized Bukkit forks for very old Minecraft versions:
+
+### Canyon
+
+Fork of CraftBukkit for Minecraft Beta 1.7.3:
+
+```yaml
+environment:
+  TYPE: CANYON
+  VERSION: "b1.7.3"
+  DISABLE_HEALTHCHECK: "true"
+  CANYON_BUILD: "26"  # Optional specific build
+```
+
+<Warning>
+  Only `VERSION=b1.7.3` is supported. Health checks must be disabled as this version pre-dates the health check mechanism.
+</Warning>
+
+### Poseidon
+
+Another fork of CraftBukkit for Minecraft Beta 1.7.3:
+
+```yaml
+environment:
+  TYPE: POSEIDON
+  VERSION: "b1.7.3"
+  DISABLE_HEALTHCHECK: "true"
+```
+
+### Uberbukkit
+
+Multi-version fork supporting Beta 1.0 - 1.7.3:
+
+```yaml
+environment:
+  TYPE: UBERBUKKIT
+  VERSION: "b1.7.3"  # Or b1.0 through b1.7.3
+  DISABLE_HEALTHCHECK: "true"
+```
+
+## Corrupted Server JAR
+
+If the downloaded server JAR is corrupted:
+
+```yaml
+environment:
+  FORCE_REDOWNLOAD: "true"
+```
+
+<Note>
+  Remove `FORCE_REDOWNLOAD` or set to `false` after successful re-download.
+</Note>
+
+## Migration to Paper
+
+Migrating from Bukkit/Spigot to Paper is straightforward:
+
+<Steps>
+  <Step title="Backup your server">
+    ```bash
+    docker stop minecraft
+    cp -r ./data ./data-backup
+    ```
+  </Step>
+  
+  <Step title="Update server type">
+    Change your compose file:
+    
+    ```yaml
+    environment:
+      TYPE: PAPER  # Changed from BUKKIT or SPIGOT
+      VERSION: "1.20.4"
+    ```
+  </Step>
+  
+  <Step title="Start server">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Paper will automatically convert your Bukkit/Spigot world.
+  </Step>
+  
+  <Step title="Verify plugins">
+    All Bukkit/Spigot plugins should work immediately. Check server logs for any issues.
+  </Step>
+</Steps>
+
+## Complete Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-spigot
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: SPIGOT
+      VERSION: "1.20.4"
+      
+      # Custom URL (if needed due to download restrictions)
+      # SPIGOT_DOWNLOAD_URL: "https://your-server.com/spigot.jar"
+      
+      # Or build from source
+      # BUILD_FROM_SOURCE: "true"
+      
+      # Server Settings
+      MOTD: "A Spigot Server"
+      DIFFICULTY: normal
+      MAX_PLAYERS: 20
+      VIEW_DISTANCE: 10
+      
+      # Performance
+      MEMORY: 4G
+      
+      # Plugins
+      SPIGET_RESOURCES: "1234,5678"
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./plugins:/data/plugins
+    
+    restart: unless-stopped
+```
+
+## Troubleshooting
+
+### Download Issues
+
+**Problem**: Cannot download Bukkit/Spigot automatically
+
+**Solution**: Use custom download URL or switch to Paper:
+
+```yaml
+environment:
+  TYPE: PAPER  # Recommended
+```
+
+Or:
+
+```yaml
+environment:
+  TYPE: SPIGOT
+  SPIGOT_DOWNLOAD_URL: "https://your-url.com/spigot.jar"
+```
+
+### Version String Issues
+
+**Problem**: Invalid version string
+
+**Solution**: Use exact version format from Bukkit/Spigot downloads page:
+
+```yaml
+environment:
+  VERSION: "1.8-R0.1-SNAPSHOT-latest"  # Not just "1.8"
+```
+
+### Plugin Compatibility
+
+**Problem**: Plugins not loading
+
+**Solution**:
+1. Verify plugin supports your Bukkit/Spigot version
+2. Check for plugin dependencies
+3. Review server logs for specific errors
+4. Consider migrating to Paper for better compatibility
+
+## Why Paper is Better
+
+| Feature | Bukkit/Spigot | Paper |
+|---------|---------------|-------|
+| Active Development | ❌ Limited | ✅ Very Active |
+| Performance | Baseline | ✅ Significantly Better |
+| Plugin Compatibility | ✅ Yes | ✅ Yes (same plugins) |
+| Bug Fixes | Slow | ✅ Fast |
+| Automated Downloads | ❌ Restricted | ✅ Supported |
+| Modern Features | Limited | ✅ Extensive |
+| Community Support | Declining | ✅ Strong |
+
+## Recommendation
+
+<Warning>
+  Unless you have a specific legacy requirement, **use [Paper](/server-types/paper) instead of Bukkit/Spigot**. Paper offers:
+  
+  - All the same plugin compatibility
+  - Much better performance
+  - Active development and support
+  - Reliable automated downloads
+  - Regular updates and bug fixes
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Migrate to Paper" icon="arrow-right" href="/server-types/paper">
+    Upgrade to Paper for better performance
+  </Card>
+  <Card title="Plugin Management" icon="plug" href="/mods-and-plugins/overview">
+    Learn about installing plugins
+  </Card>
+  <Card title="Spiget Downloads" icon="download" href="/mods-and-plugins/spiget">
+    Auto-download plugins from SpigotMC
+  </Card>
+  <Card title="Server Configuration" icon="gear" href="/configuration/server-properties">
+    Configure server properties
+  </Card>
+</CardGroup>

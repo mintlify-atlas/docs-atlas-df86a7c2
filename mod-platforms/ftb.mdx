@@ -1,0 +1,196 @@
+---
+title: Feed The Beast Modpacks
+description: Install Feed The Beast Application modpacks automatically
+---
+
+[Feed the Beast Application](https://www.feed-the-beast.com/) modpacks are supported by setting `MODPACK_PLATFORM`, `MOD_PLATFORM` or `TYPE` to `FTBA`.
+
+<Note>
+The "A" at the end of "FTBA" is important. The value "FTB" used to be an alias for "CURSEFORGE".
+</Note>
+
+This mod platform type automatically handles downloading and installing the modpack and appropriate version of Forge, so the `VERSION` does not need to be specified.
+
+<Warning>
+Requires one of the Ubuntu with Hotspot images. See the [Java versions documentation](/versions/java) for available images.
+</Warning>
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TYPE` | Yes | Set to `FTBA` |
+| `FTB_MODPACK_ID` | Yes | Numerical ID of the modpack to install |
+| `FTB_MODPACK_VERSION_ID` | No | Numerical ID of specific version (defaults to latest) |
+| `FTB_FORCE_REINSTALL` | No | Force re-installation if files are inconsistent |
+
+## Finding the Modpack ID
+
+The modpack ID can be located by:
+
+<Steps>
+  <Step title="Find your modpack">
+    Browse to [FTB Modpacks](https://www.feed-the-beast.com/modpack) and locate your desired modpack
+  </Step>
+  
+  <Step title="Extract the ID from the URL">
+    The ID is the number in the URL:
+    
+    ```
+    https://www.feed-the-beast.com/modpacks/23-ftb-infinity-evolved-17
+                                            ^^
+    ```
+    
+    In this example, the modpack ID is `23`
+  </Step>
+</Steps>
+
+## Finding the Version ID
+
+The version ID is optional. To find it:
+
+<Steps>
+  <Step title="Navigate to the modpack page">
+    Go to your modpack's page on feed-the-beast.com
+  </Step>
+  
+  <Step title="Hover over a server file">
+    Hover over a server file entry to see the download link
+  </Step>
+  
+  <Step title="Extract the version ID">
+    The version ID appears in the popup URL
+  </Step>
+</Steps>
+
+## Basic Usage
+
+<CodeGroup>
+```yaml Docker Compose - Latest Version
+services:
+  mc:
+    image: itzg/minecraft-server:java8-multiarch
+    environment:
+      EULA: "TRUE"
+      TYPE: FTBA
+      FTB_MODPACK_ID: 31
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+```yaml Docker Compose - Specific Version
+services:
+  mc:
+    image: itzg/minecraft-server:java8-multiarch
+    environment:
+      EULA: "TRUE"
+      TYPE: FTBA
+      FTB_MODPACK_ID: 31
+      FTB_MODPACK_VERSION_ID: 4091
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+```bash Docker CLI
+docker run -d --pull=always \
+  -v /path/on/host:/data \
+  -e EULA=TRUE \
+  -e TYPE=FTBA \
+  -e FTB_MODPACK_ID=31 \
+  -p 25565:25565 \
+  itzg/minecraft-server:java8-multiarch
+```
+</CodeGroup>
+
+## Example: FTB Presents Direwolf20 1.12
+
+This example runs the latest version of FTB Presents Direwolf20 1.12:
+
+```bash
+docker run -d --pull=always -v /path/on/host:/data \
+    -e EULA=TRUE -e TYPE=FTBA \
+    -e FTB_MODPACK_ID=31 -p 25565:25565 \
+    itzg/minecraft-server:java8-multiarch
+```
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:java8-multiarch
+    environment:
+      EULA: "TRUE"
+      TYPE: FTBA
+      FTB_MODPACK_ID: 31
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+
+## Upgrading
+
+### Automatic Upgrades
+
+If a specific `FTB_MODPACK_VERSION_ID` was **not** specified, simply restart the container to pick up the newest modpack version:
+
+```bash
+docker compose restart mc
+```
+
+### Manual Version Upgrades
+
+If using a specific version ID, recreate the container with the new version ID:
+
+<Steps>
+  <Step title="Update version ID">
+    Edit your compose file and update `FTB_MODPACK_VERSION_ID`
+  </Step>
+  
+  <Step title="Recreate container">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Force Reinstall
+
+If files become inconsistent (e.g., accidentally removing files), force FTB to re-run:
+
+```yaml
+environment:
+  FTB_FORCE_REINSTALL: "true"
+```
+
+<Warning>
+Remember to set this back to `false` or remove it after the reinstall completes to avoid reinstalling on every restart.
+</Warning>
+
+### Java Version Compatibility
+
+FTB modpacks typically require specific Java versions:
+
+- Java 8: Most legacy FTB packs (1.7.10 - 1.12.2)
+- Java 17+: Modern FTB packs (1.18+)
+
+Use the appropriate image tag:
+
+```yaml
+image: itzg/minecraft-server:java8-multiarch
+# or
+image: itzg/minecraft-server:java17
+```
+
+<Note>
+Most FTB modpacks require at least 4GB of memory. Set `MEMORY` to `4G` or higher.
+</Note>

@@ -1,0 +1,496 @@
+---
+title: Hybrid Servers
+description: Run both Forge/Fabric mods and Bukkit/Spigot plugins simultaneously
+---
+
+Hybrid servers combine modding platforms (Forge/Fabric) with plugin platforms (Bukkit/Spigot/Paper), allowing you to run both mods and plugins on the same server. This provides maximum flexibility but comes with complexity and compatibility considerations.
+
+## Overview
+
+Hybrid servers enable:
+
+- **Mods + Plugins**: Run gameplay mods alongside server plugins
+- **Maximum Customization**: Access both mod and plugin ecosystems
+- **Unique Experiences**: Combine features impossible with either platform alone
+
+<Warning>
+  Hybrid servers are complex and may have compatibility issues. Not all mods and plugins work well together. Use hybrid servers only when you specifically need both mods AND plugins.
+</Warning>
+
+## Available Hybrid Types
+
+### Magma (Legacy)
+
+**Status**: Terminated project - Use alternatives below
+
+Combination of Forge and PaperMC.
+
+```yaml
+environment:
+  TYPE: MAGMA
+  VERSION: "1.12.2"  # Limited versions: 1.12.2, 1.16.5
+```
+
+<Warning>
+  The Magma project has been terminated. Use Magma Maintained or Ketting instead.
+</Warning>
+
+### Magma Maintained
+
+Community-maintained alternative to Magma.
+
+```yaml
+environment:
+  TYPE: MAGMA_MAINTAINED
+  VERSION: "1.20.1"  # Supported: 1.12.2, 1.18.2, 1.19.3, 1.20.1
+  FORGE_VERSION: "40.2.0"
+  MAGMA_MAINTAINED_TAG: "v1.20.1-40.2.0-1.0.0"
+```
+
+<Note>
+  Both `FORGE_VERSION` and `MAGMA_MAINTAINED_TAG` must be specified. Find supported versions in the [releases page](https://github.com/magmamaintained/) for your Minecraft version.
+</Note>
+
+### Ketting
+
+Modern Forge + Paper hybrid for Minecraft 1.20.1+.
+
+```yaml
+environment:
+  TYPE: KETTING
+  VERSION: "1.20.1"  # 1.20.1 or later
+  FORGE_VERSION: "47.2.20"  # Optional - auto-selected by launcher
+  KETTING_VERSION: "0.1.4"  # Optional - auto-selected by launcher
+```
+
+Find available versions at [Ketting Server Releases](https://reposilite.c0d3m4513r.com/#/Ketting-Server-Releases/org/kettingpowered/server/forge).
+
+Version structure: `MinecraftVersion-ForgeVersion-KettingVersion`
+- Example: `1.20.1-47.2.20-0.1.4`
+  - Minecraft: `1.20.1`
+  - Forge: `47.2.20`
+  - Ketting: `0.1.4`
+
+### Mohist
+
+Forge + Paper hybrid server.
+
+```yaml
+environment:
+  TYPE: MOHIST
+  VERSION: "1.16.5"  # Limited versions available
+  MOHIST_BUILD: "374"  # Optional specific build
+```
+
+<Note>
+  Limited Minecraft versions are supported. Check [Mohist releases](https://github.com/MohistMC/Mohist) for available versions.
+</Note>
+
+### Youer
+
+Another Forge + Paper hybrid from MohistMC.
+
+```yaml
+environment:
+  TYPE: YOUER
+  VERSION: "1.16.5"
+  MOHIST_BUILD: "374"  # Optional specific build
+```
+
+### Banner
+
+Forge + Paper hybrid server.
+
+```yaml
+environment:
+  TYPE: BANNER
+  VERSION: "1.16.5"
+  MOHIST_BUILD: "374"  # Optional specific build
+```
+
+### Arclight
+
+Forge/Fabric/NeoForge + Bukkit hybrid.
+
+```yaml
+environment:
+  TYPE: ARCLIGHT
+  VERSION: "1.20.1"
+  ARCLIGHT_TYPE: FORGE  # Options: FORGE, FABRIC, NEOFORGE
+```
+
+Supports multiple mod loaders:
+- `FORGE` - Forge + Bukkit
+- `FABRIC` - Fabric + Bukkit  
+- `NEOFORGE` - NeoForge + Bukkit
+
+## Configuration Examples
+
+### Ketting with Forge Mods and Spigot Plugins
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-ketting
+    
+    environment:
+      EULA: "TRUE"
+      TYPE: KETTING
+      VERSION: "1.20.1"
+      
+      # Server Settings
+      MOTD: "Hybrid Server - Mods + Plugins"
+      DIFFICULTY: normal
+      MAX_PLAYERS: 30
+      
+      # Performance
+      MEMORY: 8G
+      USE_AIKAR_FLAGS: "true"
+      
+      # Auto-install plugins
+      SPIGET_RESOURCES: "1234,5678"
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods      # Forge mods
+      - ./plugins:/data/plugins  # Bukkit/Spigot plugins
+    
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft-ketting \
+  -e EULA=TRUE \
+  -e TYPE=KETTING \
+  -e VERSION=1.20.1 \
+  -e MEMORY=8G \
+  -p 25565:25565 \
+  -v ./data:/data \
+  -v ./mods:/data/mods \
+  -v ./plugins:/data/plugins \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+### Arclight with Fabric and Plugins
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-arclight
+    
+    environment:
+      EULA: "TRUE"
+      TYPE: ARCLIGHT
+      VERSION: "1.20.1"
+      ARCLIGHT_TYPE: FABRIC  # Fabric + Bukkit
+      
+      # Install Fabric API for mods
+      MODRINTH_PROJECTS: |
+        fabric-api
+        lithium
+      
+      # Install plugins
+      SPIGET_RESOURCES: "1234,5678"
+      
+      MEMORY: 8G
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./plugins:/data/plugins
+```
+
+### Magma Maintained
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    
+    environment:
+      EULA: "TRUE"
+      TYPE: MAGMA_MAINTAINED
+      VERSION: "1.20.1"
+      FORGE_VERSION: "40.2.0"
+      MAGMA_MAINTAINED_TAG: "v1.20.1-40.2.0-1.0.0"
+      
+      MEMORY: 8G
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./plugins:/data/plugins
+```
+
+## Directory Structure
+
+Hybrid servers use both mod and plugin directories:
+
+```
+data/
+├── mods/           # Forge/Fabric mods (.jar files)
+│   ├── mod1.jar
+│   └── mod2.jar
+├── plugins/        # Bukkit/Spigot plugins (.jar files)
+│   ├── plugin1.jar
+│   └── plugin2.jar
+├── config/         # Mod configurations
+└── plugins/*/      # Plugin configurations
+```
+
+## Managing Mods and Plugins
+
+### Installing Forge/Fabric Mods
+
+```yaml
+volumes:
+  - ./mods:/data/mods
+```
+
+Place mod `.jar` files in `./mods/` directory.
+
+### Installing Bukkit/Spigot Plugins
+
+```yaml
+volumes:
+  - ./plugins:/data/plugins
+```
+
+Place plugin `.jar` files in `./plugins/` directory.
+
+### Auto-Installation
+
+Combine auto-download methods:
+
+```yaml
+environment:
+  TYPE: KETTING
+  
+  # Auto-download mods from Modrinth
+  MODRINTH_PROJECTS: |
+    jei
+    journeymap
+  
+  # Auto-download plugins from Spiget
+  SPIGET_RESOURCES: "1234,5678"
+  
+  # Or from CurseForge
+  CF_API_KEY: "your-key"
+  CF_SLUG: "forge-mod-name"
+```
+
+## Compatibility Considerations
+
+### Mod-Plugin Conflicts
+
+<Warning>
+  Not all mods and plugins work together:
+  
+  - **Permission Systems**: Mod permissions may conflict with plugin permission systems
+  - **Economy Systems**: Don't mix mod and plugin economy systems
+  - **World Management**: Use either mod or plugin world managers, not both
+  - **Chat Systems**: Chat mods and plugins often conflict
+</Warning>
+
+### Testing Compatibility
+
+<Steps>
+  <Step title="Start with basics">
+    Begin with only essential mods and plugins.
+  </Step>
+  
+  <Step title="Add gradually">
+    Add mods and plugins one at a time, testing between each addition.
+  </Step>
+  
+  <Step title="Monitor logs">
+    Watch server logs for errors and conflicts:
+    
+    ```bash
+    docker logs -f minecraft-hybrid
+    ```
+  </Step>
+  
+  <Step title="Test functionality">
+    Verify both mods and plugins work as expected.
+  </Step>
+</Steps>
+
+### Known Compatible Combinations
+
+**Generally Compatible**:
+- Content/gameplay mods + utility plugins
+- Tech mods + protection plugins
+- Performance mods + administration plugins
+
+**Often Incompatible**:
+- Mod permissions + plugin permissions
+- Mod economies + plugin economies
+- Client-side rendering mods + server plugins
+
+## Performance Impact
+
+### Resource Requirements
+
+Hybrid servers require more resources:
+
+| Players | Mods + Plugins | Recommended RAM |
+|---------|---------------|----------------|
+| 1-10 | Light | 6-8GB |
+| 10-20 | Medium | 8-10GB |
+| 20-50 | Medium | 10-14GB |
+| 50+ | Heavy | 16GB+ |
+
+### Optimization
+
+```yaml
+environment:
+  MEMORY: 10G
+  USE_AIKAR_FLAGS: "true"
+  
+  # Install performance mods
+  MODRINTH_PROJECTS: |
+    ferritecore
+    modernfix
+```
+
+## Complete Production Example
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-hybrid
+    
+    environment:
+      # Hybrid Server Type
+      EULA: "TRUE"
+      TYPE: KETTING
+      VERSION: "1.20.1"
+      
+      # Auto-install mods from Modrinth
+      MODRINTH_PROJECTS: |
+        jei
+        journeymap
+        ferritecore
+      
+      # Auto-install plugins
+      SPIGET_RESOURCES: |
+        274
+        1997
+      
+      # Server Settings
+      MOTD: "Hybrid: Forge Mods + Spigot Plugins"
+      DIFFICULTY: normal
+      MODE: survival
+      MAX_PLAYERS: 30
+      VIEW_DISTANCE: 10
+      
+      # Performance
+      MEMORY: 10G
+      USE_AIKAR_FLAGS: "true"
+      
+      # World
+      LEVEL: "world"
+      
+      # Admin
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "secure-password"
+    
+    ports:
+      - "25565:25565"
+      - "25575:25575"  # RCON
+    
+    volumes:
+      - ./data:/data
+      - ./mods:/data/mods
+      - ./plugins:/data/plugins
+      - ./config:/data/config
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Troubleshooting
+
+### Server Won't Start
+
+1. Check logs for mod/plugin conflicts:
+   ```bash
+   docker logs minecraft-hybrid
+   ```
+
+2. Remove recently added mods/plugins
+
+3. Verify version compatibility
+
+### Mods Not Loading
+
+- Ensure mods are in `/data/mods/` directory
+- Verify mods are compatible with Forge/Fabric version
+- Check for required dependencies
+
+### Plugins Not Loading
+
+- Ensure plugins are in `/data/plugins/` directory
+- Verify plugins are compatible with Bukkit/Spigot API
+- Check plugin dependencies
+
+### Performance Issues
+
+1. Increase allocated memory
+2. Remove unnecessary mods/plugins
+3. Install performance optimization mods
+4. Reduce view distance and simulation distance
+
+## When to Use Hybrid Servers
+
+**Use Hybrid When:**
+- You need specific mods AND specific plugins
+- Creating unique gameplay requiring both ecosystems
+- Running a network with complex requirements
+
+**Use Single Platform When:**
+- Only need mods → Use [Forge](/server-types/forge) or [Fabric](/server-types/fabric)
+- Only need plugins → Use [Paper](/server-types/paper)
+- Want maximum stability → Avoid mixing platforms
+- Performance is critical → Single platforms perform better
+
+## Version Support Matrix
+
+| Hybrid Type | MC 1.12.2 | MC 1.16.5 | MC 1.18.2 | MC 1.19.3 | MC 1.20.1+ |
+|-------------|-----------|-----------|-----------|-----------|------------|
+| Magma Maintained | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Ketting | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Mohist | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Arclight | ❌ | ✅ | ✅ | ✅ | ✅ |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Forge Mods" icon="hammer" href="/server-types/forge">
+    Learn about Forge mod installation
+  </Card>
+  <Card title="Fabric Mods" icon="scissors" href="/server-types/fabric">
+    Learn about Fabric mod installation
+  </Card>
+  <Card title="Paper Plugins" icon="plug" href="/server-types/paper">
+    Learn about plugin installation
+  </Card>
+  <Card title="Performance Tuning" icon="gauge-high" href="/configuration/performance">
+    Optimize hybrid server performance
+  </Card>
+</CardGroup>

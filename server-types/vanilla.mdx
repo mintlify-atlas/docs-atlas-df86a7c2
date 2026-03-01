@@ -1,0 +1,315 @@
+---
+title: Vanilla Server
+description: Run the official Mojang Minecraft server for a pure, unmodified experience
+---
+
+The Vanilla server is the official Minecraft server software provided by Mojang. It offers the baseline Minecraft experience without any modifications, plugins, or performance enhancements.
+
+## Overview
+
+Vanilla is the default server type and provides the pure Minecraft experience as intended by Mojang. While it lacks plugin support and performance optimizations found in other server types, it's ideal for:
+
+- Testing vanilla game mechanics
+- Small private servers for friends
+- Ensuring complete compatibility with official clients
+- Avoiding any modifications to gameplay
+
+<Note>
+  If you need better performance or plugin support, consider using [Paper](/server-types/paper) instead, which is fully compatible with vanilla clients while offering significant improvements.
+</Note>
+
+## Configuration
+
+### Basic Setup
+
+Vanilla is the default type, so you can omit the `TYPE` variable or explicitly set it:
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      # TYPE: VANILLA  # Optional - this is the default
+      VERSION: "1.20.4"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+```bash Docker Run
+docker run -d \
+  --name minecraft \
+  -e EULA=TRUE \
+  -e TYPE=VANILLA \
+  -e VERSION=1.20.4 \
+  -p 25565:25565 \
+  -v ./data:/data \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+### Explicit Vanilla Type
+
+To explicitly specify vanilla server:
+
+```yaml
+environment:
+  TYPE: VANILLA
+  VERSION: "1.20.4"
+```
+
+## Version Selection
+
+The `VERSION` variable controls which Minecraft version to run:
+
+<Steps>
+  <Step title="Latest Release (Default)">
+    Omit `VERSION` or set to `LATEST` to automatically use the newest Minecraft release:
+    
+    ```yaml
+    environment:
+      EULA: "TRUE"
+      # VERSION not specified = latest
+    ```
+  </Step>
+  
+  <Step title="Specific Version">
+    Set a specific Minecraft version:
+    
+    ```yaml
+    environment:
+      VERSION: "1.20.4"
+    ```
+  </Step>
+  
+  <Step title="Snapshot Versions">
+    Use snapshot versions for testing upcoming features:
+    
+    ```yaml
+    environment:
+      VERSION: "23w51a"
+    ```
+  </Step>
+</Steps>
+
+## Features and Limitations
+
+### What Vanilla Provides
+
+✅ **Pure Minecraft Experience**
+- Unmodified gameplay mechanics
+- Official Mojang server software
+- Compatible with all vanilla clients
+- Regular updates from Mojang
+
+✅ **Simplicity**
+- No complex configurations
+- Minimal setup required
+- Predictable behavior
+
+### What Vanilla Lacks
+
+❌ **No Plugin Support**
+- Cannot use Bukkit/Spigot plugins
+- No permission systems
+- Limited customization options
+
+❌ **Limited Performance**
+- No optimizations beyond official software
+- Basic chunk loading
+- Standard tick handling
+
+❌ **Fewer Admin Tools**
+- Basic commands only
+- Limited server management features
+
+## Server Configuration
+
+### Server Properties
+
+Configure server behavior using environment variables that map to `server.properties`:
+
+```yaml
+environment:
+  EULA: "TRUE"
+  TYPE: VANILLA
+  VERSION: "1.20.4"
+  
+  # Server properties
+  MOTD: "A Vanilla Minecraft Server"
+  DIFFICULTY: normal
+  MODE: survival
+  MAX_PLAYERS: 20
+  VIEW_DISTANCE: 10
+  SPAWN_PROTECTION: 16
+  ENABLE_COMMAND_BLOCK: "true"
+  PVP: "true"
+  HARDCORE: "false"
+```
+
+### Memory Allocation
+
+Set Java memory limits for optimal performance:
+
+```yaml
+environment:
+  MEMORY: 4G
+  # Or use separate min/max
+  INIT_MEMORY: 2G
+  MAX_MEMORY: 4G
+```
+
+<Note>
+  Allocate at least 2GB for small servers (1-5 players), 4GB for medium servers (5-20 players), and 6GB+ for larger servers.
+</Note>
+
+## World Management
+
+### Using Existing Worlds
+
+Mount an existing world directory:
+
+```yaml
+volumes:
+  - ./data:/data
+  - ./my-world:/data/world
+```
+
+### World Generation Settings
+
+```yaml
+environment:
+  LEVEL: "my-world"
+  SEED: "12345678"
+  LEVEL_TYPE: "DEFAULT"  # or FLAT, LARGE_BIOMES, AMPLIFIED
+  GENERATE_STRUCTURES: "true"
+```
+
+## Complete Example
+
+Here's a production-ready vanilla server configuration:
+
+```yaml docker-compose.yml
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: minecraft-vanilla
+    
+    environment:
+      # Server Type
+      EULA: "TRUE"
+      TYPE: VANILLA
+      VERSION: "1.20.4"
+      
+      # Server Settings
+      MOTD: "My Vanilla Server"
+      DIFFICULTY: hard
+      MODE: survival
+      MAX_PLAYERS: 20
+      VIEW_DISTANCE: 12
+      SIMULATION_DISTANCE: 10
+      
+      # Performance
+      MEMORY: 4G
+      
+      # World Settings
+      LEVEL: "world"
+      SEED: "minecraft"
+      GENERATE_STRUCTURES: "true"
+      
+      # Server Features
+      ENABLE_WHITELIST: "true"
+      ENFORCE_WHITELIST: "true"
+      PVP: "true"
+      SPAWN_ANIMALS: "true"
+      SPAWN_MONSTERS: "true"
+      SPAWN_NPCS: "true"
+      
+      # Backup
+      ENABLE_AUTOSTOP_TIMEOUT_ESTIMATION: "true"
+      MAX_TICK_TIME: 60000
+    
+    ports:
+      - "25565:25565"
+    
+    volumes:
+      - ./data:/data
+    
+    restart: unless-stopped
+    
+    stdin_open: true
+    tty: true
+```
+
+## Upgrading from Vanilla
+
+If you need more features, you can upgrade to Paper while maintaining compatibility:
+
+<Steps>
+  <Step title="Stop your server">
+    Stop the vanilla server container:
+    
+    ```bash
+    docker stop minecraft
+    ```
+  </Step>
+  
+  <Step title="Change server type">
+    Update your compose file:
+    
+    ```yaml
+    environment:
+      TYPE: PAPER  # Changed from VANILLA
+      VERSION: "1.20.4"
+    ```
+  </Step>
+  
+  <Step title="Restart">
+    Start with Paper:
+    
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Paper will convert your vanilla world automatically.
+  </Step>
+</Steps>
+
+<Warning>
+  Always backup your world data before changing server types.
+</Warning>
+
+## When to Choose Vanilla
+
+**Choose Vanilla when:**
+- You want the official, unmodified Minecraft experience
+- You're testing vanilla game mechanics
+- You need guaranteed compatibility with Mojang's software
+- You're running a small private server without need for plugins
+
+**Consider alternatives when:**
+- You need better performance → Use [Paper](/server-types/paper)
+- You want plugins → Use [Paper](/server-types/paper) or [Spigot](/server-types/bukkit-spigot)
+- You want mods → Use [Fabric](/server-types/fabric) or [Forge](/server-types/forge)
+- You need both mods and plugins → Use [Hybrid servers](/server-types/hybrids)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Paper Server" icon="file-lines" href="/server-types/paper">
+    Upgrade to Paper for better performance
+  </Card>
+  <Card title="Server Configuration" icon="gear" href="/configuration/server-properties">
+    Learn about server.properties options
+  </Card>
+  <Card title="World Management" icon="globe" href="/configuration/world-data">
+    Manage worlds and backups
+  </Card>
+  <Card title="Version Management" icon="code-branch" href="/configuration/versions">
+    Control Minecraft versions
+  </Card>
+</CardGroup>

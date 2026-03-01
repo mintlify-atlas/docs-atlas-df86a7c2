@@ -1,0 +1,445 @@
+---
+title: Auto CurseForge
+description: Automatically manage CurseForge modpacks with upgrade support and version tracking
+---
+
+To manage a CurseForge modpack automatically with upgrade support, pinned or latest version tracking, set `MODPACK_PLATFORM`, `MOD_PLATFORM` or `TYPE` to `AUTO_CURSEFORGE`.
+
+The appropriate mod loader (Forge/Fabric) version is automatically installed as declared by the modpack. This mode also cleans up unused files from previous versions, but world data is never auto-removed.
+
+## API Key Required
+
+<Warning>
+A CurseForge API key is **required** to use this feature. Go to the [CurseForge Developer Console](https://console.curseforge.com/), generate an API key, and set the environment variable `CF_API_KEY`.
+</Warning>
+
+### Escaping Dollar Signs
+
+When entering your API key in a Docker Compose file, escape any `$` character with a second `$`:
+
+```yaml title="compose.yaml"
+environment:
+  CF_API_KEY: '$$11$$22$$33aaaaaaaaaaaaaaaaaaaaaaaaaa'
+```
+
+With `docker run`, use single quotes:
+
+```bash
+docker run ... -e CF_API_KEY='$11$22$33aaaaaaaaaaaaaaaaaaaaaaaaaa'
+```
+
+### Using .env Files (Recommended)
+
+To avoid exposing the API key, use a `.env` file which is [loaded automatically by Docker Compose](https://docs.docker.com/compose/environment-variables/set-environment-variables/#substitute-with-an-env-file).
+
+<Steps>
+  <Step title="Create .env file">
+    Create a `.env` file in the same directory as your `compose.yaml`:
+    
+    ```title=".env"
+    CF_API_KEY='$11$22$33aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    ```
+    
+    <Note>
+    You **do not** need to escape `$` characters in the `.env` file when wrapped in single quotes.
+    </Note>
+  </Step>
+  
+  <Step title="Reference in compose file">
+    ```yaml title="compose.yaml"
+    environment:
+      CF_API_KEY: ${CF_API_KEY}
+    ```
+  </Step>
+  
+  <Step title="File structure">
+    Your directory should look like:
+    
+    ```
+    minecraft-server/
+    ├── .env
+    ├── compose.yaml
+    ├── data/
+    ```
+  </Step>
+</Steps>
+
+For `docker run`, specify the `.env` file explicitly:
+
+```bash
+docker run --env-file=.env itzg/minecraft-server
+```
+
+### Using Docker Secrets
+
+Alternatively, use [Docker secrets](https://docs.docker.com/compose/how-tos/use-secrets/):
+
+```yaml title="compose.yaml"
+services:
+  mc:
+    environment:
+      CF_API_KEY_FILE: /run/secrets/cf_api_key
+    secrets:
+      - cf_api_key
+
+secrets:
+  cf_api_key:
+    file: cf_api_key.secret
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TYPE` | Yes | Set to `AUTO_CURSEFORGE` |
+| `CF_API_KEY` | Yes | CurseForge API key |
+| `CF_PAGE_URL` | * | Modpack or file page URL |
+| `CF_SLUG` | * | Modpack slug from URL |
+| `CF_FILE_ID` | No | Numerical file ID for specific version |
+| `CF_FILENAME_MATCHER` | No | Substring to match desired filename |
+| `CF_MODPACK_ZIP` | No | Container path to unpublished modpack ZIP |
+| `CF_MODPACK_MANIFEST` | No | Container path to modpack manifest JSON |
+| `CF_EXCLUDE_MODS` | No | Comma/space delimited list of mod slugs/IDs to exclude |
+| `CF_FORCE_INCLUDE_MODS` | No | Comma/space delimited list of mod slugs/IDs to include |
+| `CF_EXCLUDE_ALL_MODS` | No | Exclude all mods (default: `false`) |
+| `CF_EXCLUDE_INCLUDE_FILE` | No | Path to JSON file with exclude/include rules |
+| `CF_OVERRIDES_EXCLUSIONS` | No | Ant-style paths to exclude from overrides |
+| `CF_IGNORE_MISSING_FILES` | No | Glob pattern of files to ignore if missing |
+| `CF_SET_LEVEL_FROM` | No | Set LEVEL from `WORLD_FILE` or `OVERRIDES` |
+| `CF_PARALLEL_DOWNLOADS` | No | Number of parallel downloads (default: 4) |
+| `CF_OVERRIDES_SKIP_EXISTING` | No | Skip existing files in overrides (default: `false`) |
+| `CF_FORCE_SYNCHRONIZE` | No | Force re-evaluation of excludes/includes |
+| `CF_FORCE_REINSTALL_MODLOADER` | No | Force modloader reinstall (default: `false`) |
+| `CF_DOWNLOADS_REPO` | No | Path for manual downloads (default: `/downloads`) |
+| `CF_MOD_LOADER_VERSION` | No | Override mod loader version |
+
+<Note>
+* Either `CF_PAGE_URL` or `CF_SLUG` is required to identify the modpack
+</Note>
+
+## Specifying the Modpack
+
+### Using Page URL
+
+Pass the modpack page URL or a specific file URL:
+
+<CodeGroup>
+```yaml Modpack Page URL
+environment:
+  MODPACK_PLATFORM: AUTO_CURSEFORGE
+  CF_API_KEY: ${CF_API_KEY}
+  CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/all-the-mods-8
+```
+
+```yaml Specific File URL
+environment:
+  MODPACK_PLATFORM: AUTO_CURSEFORGE
+  CF_API_KEY: ${CF_API_KEY}
+  CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/all-the-mods-8/files/4248390
+```
+</CodeGroup>
+
+### Using Slug
+
+The slug is the short identifier in the URL after `/modpacks/`:
+
+```yaml
+environment:
+  MODPACK_PLATFORM: AUTO_CURSEFORGE
+  CF_API_KEY: ${CF_API_KEY}
+  CF_SLUG: all-the-mods-8
+```
+
+## Pinning Versions
+
+By default, the latest modpack file and mod loader are installed on startup (with automatic upgrading). To pin to a specific version:
+
+### Using File ID
+
+```yaml
+CF_SLUG: all-the-mods-8
+CF_FILE_ID: "4248390"
+```
+
+### Using Filename Matcher
+
+```yaml
+CF_SLUG: all-the-mods-8
+CF_FILENAME_MATCHER: 1.0.7
+```
+
+### Using Specific File URL
+
+```yaml
+CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/all-the-mods-8/files/4248390
+```
+
+<Warning>
+**Do not select a server file** - they lack the required manifest and defeat automation capabilities. Always use client files.
+</Warning>
+
+## Examples
+
+<CodeGroup>
+```yaml All The Mods 8
+services:
+  mc:
+    image: itzg/minecraft-server:java17
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      CF_API_KEY: ${CF_API_KEY}
+      CF_PAGE_URL: https://www.curseforge.com/minecraft/modpacks/all-the-mods-8
+      MEMORY: 4G
+    volumes:
+      - mc-data:/data
+
+volumes:
+  mc-data:
+```
+
+```yaml Using Slug and File ID
+services:
+  mc:
+    image: itzg/minecraft-server:java17
+    environment:
+      EULA: "true"
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      CF_API_KEY: ${CF_API_KEY}
+      CF_SLUG: all-the-mods-8
+      CF_FILE_ID: "4248390"
+      MEMORY: 4G
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+```
+
+```yaml One Block Modded
+services:
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "true"
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      CF_API_KEY: ${CF_API_KEY}
+      CF_SLUG: one-block-modded
+      CF_MODPACK_ZIP: /modpacks/Modded+OneBlock.zip
+      CF_SET_LEVEL_FROM: OVERRIDES
+      MEMORY: 4G
+    volumes:
+      - mc-data:/data
+      - ./modpacks:/modpacks:ro
+
+volumes:
+  mc-data:
+```
+</CodeGroup>
+
+## Custom Mod Loader Versions
+
+Override the modpack's declared mod loader version:
+
+```yaml
+environment:
+  CF_MOD_LOADER_VERSION: "43.4.22"
+```
+
+<Warning>
+Using a custom mod loader version that differs significantly from the modpack's design may cause compatibility issues. Use carefully and test thoroughly.
+</Warning>
+
+## Manual Downloads
+
+For mods/modpacks not allowed for automated download, attach the `/downloads` container path:
+
+<Steps>
+  <Step title="Create downloads directory">
+    Create a directory next to `compose.yaml`. Common convention is `downloads`
+  </Step>
+  
+  <Step title="Download files">
+    Use a browser to download files listed in "Mods Need Download" output
+  </Step>
+  
+  <Step title="Mount the directory">
+    ```yaml
+    volumes:
+      - ./data:/data
+      - ./downloads:/downloads
+    ```
+  </Step>
+  
+  <Step title="Restart">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+It's important to use a browser to download the files. If your Docker host is running without a graphical interface, use `scp` or similar to transfer files.
+</Warning>
+
+The subdirectories `mods`, `modpacks`, and `worlds` are also checked. To change the location, set `CF_DOWNLOADS_REPO`. To disable, set it to an empty string.
+
+## Unpublished Modpacks
+
+For unpublished modpack ZIPs or custom manifests:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server:latest
+    environment:
+      EULA: true
+      MODPACK_PLATFORM: AUTO_CURSEFORGE
+      CF_API_KEY: ${CF_API_KEY}
+      CF_MODPACK_MANIFEST: /manifests/manifest.json
+      CF_SLUG: "custom"
+    volumes:
+      - ./data:/data
+      - ./manifests:/manifests:ro
+```
+
+<Note>
+The modpack slug or page URL must still be provided even when using `CF_MODPACK_ZIP` or `CF_MODPACK_MANIFEST`.
+</Note>
+
+## Excluding Client Mods
+
+Exclude mods that aren't server-compatible:
+
+```yaml
+environment:
+  CF_EXCLUDE_MODS: |
+    # Exclude client-side mods not published correctly
+    creative-core
+    default-options
+```
+
+<Note>
+Comments can be embedded in the list using the `#` character.
+</Note>
+
+For complex scenarios, use a JSON exclude/include file:
+
+```yaml
+environment:
+  CF_EXCLUDE_INCLUDE_FILE: /config/exclude-include.json
+```
+
+The [schema is documented here](https://github.com/itzg/mc-image-helper#excludeinclude-file-schema). By default, [the bundled file](https://raw.githubusercontent.com/itzg/docker-minecraft-server/master/files/cf-exclude-include.json) is used.
+
+### Finding Project IDs
+
+A mod's project ID is shown on the right side of the project page.
+
+### Force Including Mods
+
+For mods incorrectly tagged as client-only:
+
+```yaml
+environment:
+  CF_FORCE_INCLUDE_MODS: sophisticated-backpacks,jade
+```
+
+<Warning>
+`CF_FORCE_INCLUDE_MODS` will not download additional mods. For additional mods, use the `CURSEFORGE_FILES` variable.
+</Warning>
+
+## Excluding Overrides Files
+
+Modpack ZIPs include an `overrides` subdirectory with config files, world data, and extra mods. Exclude specific files using ant-style paths:
+
+```yaml
+environment:
+  CF_OVERRIDES_EXCLUSIONS: |
+    mods/iris*.jar
+    mods/sodium*.jar
+```
+
+### Ant-style Path Patterns
+
+| Symbol | Behavior |
+|--------|----------|
+| `*` | Matches zero, one, or many characters except a slash |
+| `**` | Matches zero, one, or many characters including slashes |
+| `?` | Matches one character |
+
+## World/Level Data
+
+Some modpacks include world data via worlds file or overrides. Set the `LEVEL` automatically:
+
+```yaml
+environment:
+  CF_SET_LEVEL_FROM: WORLD_FILE
+  # or
+  CF_SET_LEVEL_FROM: OVERRIDES
+```
+
+## Ignoring Missing Files
+
+Some mods use temporary files that get deleted, like gregtech. Prevent re-installation:
+
+```yaml
+environment:
+  CF_IGNORE_MISSING_FILES: |
+    mods/gregtech-2.6.2-beta.jar
+    mods/*.jar
+```
+
+<Note>
+A warning log will indicate missing files:
+```
+Re-installing due to missing files from modpack: [mods/gregtech-2.6.2-beta.jar]
+```
+</Note>
+
+## Extra Options
+
+### Parallel Downloads
+
+Control concurrent mod downloads:
+
+```yaml
+CF_PARALLEL_DOWNLOADS: 8
+```
+
+### Skip Existing Overrides
+
+Skip files in overrides that already exist:
+
+```yaml
+CF_OVERRIDES_SKIP_EXISTING: "true"
+```
+
+<Note>
+World data is always skipped if present.
+</Note>
+
+### Force Reinstall Modloader
+
+Force modloader reinstallation if files are corrupted:
+
+```yaml
+CF_FORCE_REINSTALL_MODLOADER: "true"
+```
+
+## Troubleshooting
+
+<Warning>
+If exclude/include changes aren't taking effect, set `CF_FORCE_SYNCHRONIZE` to `true` to force re-evaluation.
+</Warning>
+
+<Note>
+Most modpacks require significant memory. Set `MEMORY` to at least `4G`.
+</Note>
+
+<Note>
+Be sure to use the appropriate [image tag for the Java version](/versions/java) compatible with the modpack.
+</Note>

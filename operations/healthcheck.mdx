@@ -1,0 +1,255 @@
+---
+title: Health Checking
+description: Configure and monitor Minecraft server health checks using mc-monitor and mc-health
+---
+
+The Minecraft server image includes [mc-monitor](https://github.com/itzg/mc-monitor) for health checking. Health checks allow Docker and orchestration systems to monitor server status and automatically restart unhealthy containers.
+
+## Default Health Check
+
+The image includes a built-in health check that continuously monitors the server status:
+
+```bash
+# View container health status
+docker ps
+```
+
+**Example output:**
+
+```
+CONTAINER ID   IMAGE   COMMAND    CREATED         STATUS                   PORTS                      NAMES
+b418af073764   mc      "/start"   43 seconds ago  Up 41 seconds (healthy)  0.0.0.0:25565->25565/tcp   mc
+```
+
+## Checking Health Status
+
+### Using Docker Inspect
+
+Query the container's health status programmatically:
+
+```bash
+docker container inspect -f "{{.State.Health.Status}}" mc
+```
+
+**Output:**
+```
+healthy
+```
+
+Possible values:
+- `healthy` - Server is running and responding
+- `unhealthy` - Server is not responding
+- `starting` - Server is still starting up
+
+### Using mc-health Wrapper
+
+The `mc-health` script wraps `mc-monitor status` with the correct arguments:
+
+```bash
+# Execute health check inside container
+docker exec mc mc-health
+```
+
+## Custom Health Check Configuration
+
+You can customize health check parameters in a Docker Compose file:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: mc-health
+      start_period: 1m
+      interval: 5s
+      retries: 20
+      timeout: 10s
+```
+
+### Health Check Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|----------|
+| `test` | Command to run for health check | `mc-health` |
+| `start_period` | Grace period before health checks begin | `1m` |
+| `interval` | Time between health checks | `5s` |
+| `retries` | Number of consecutive failures before unhealthy | `20` |
+| `timeout` | Maximum time for health check to complete | `10s` |
+
+## Disabling Health Checks
+
+### Using Environment Variable
+
+Some orchestration systems (like Portainer) don't allow disabling the default health check. Use the environment variable:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      DISABLE_HEALTHCHECK: "true"
+```
+
+### Using Docker Compose
+
+Disable health checks directly in the service declaration:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    healthcheck:
+      disable: true
+      test: ["NONE"]
+```
+
+## Health Checks with Auto-Pause
+
+When using the [auto-pause feature](/operations/autopause), reference the `mc-health` wrapper instead of `mc-status` directly:
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      ENABLE_AUTOPAUSE: "true"
+      MAX_TICK_TIME: "-1"
+    healthcheck:
+      test: mc-health  # Important: use mc-health, not mc-status
+      start_period: 2m
+      interval: 10s
+```
+
+<Warning>
+  When auto-pause is enabled, the server may be in a paused state. The `mc-health` script correctly handles paused servers, while direct `mc-status` calls may report false negatives.
+</Warning>
+
+## Health Checks for Older Versions
+
+Health checks are automatically disabled for Minecraft versions before Beta 1.8, as these versions don't support server pinging.
+
+<Note>
+  Versions before Beta 1.8 lack the Server List Ping protocol. See the [Minecraft Wiki](https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping#Beta_1.8_to_1.3) for more information.
+</Note>
+
+## Kubernetes Health Checks
+
+For Kubernetes deployments, configure liveness and readiness probes:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: minecraft
+spec:
+  containers:
+  - name: minecraft
+    image: itzg/minecraft-server
+    env:
+    - name: EULA
+      value: "TRUE"
+    livenessProbe:
+      exec:
+        command:
+        - mc-health
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      exec:
+        command:
+        - mc-health
+      initialDelaySeconds: 30
+      periodSeconds: 5
+      failureThreshold: 2
+```
+
+## Monitoring Health Check Logs
+
+View detailed health check logs:
+
+```bash
+# View health check output
+docker inspect mc | jq '.[0].State.Health'
+```
+
+**Example output:**
+
+```json
+{
+  "Status": "healthy",
+  "FailingStreak": 0,
+  "Log": [
+    {
+      "Start": "2026-03-01T10:30:00.000000000Z",
+      "End": "2026-03-01T10:30:01.000000000Z",
+      "ExitCode": 0,
+      "Output": "Server is healthy"
+    }
+  ]
+}
+```
+
+## Troubleshooting
+
+### Health Check Failing on Startup
+
+Increase the `start_period` to give the server more time to start:
+
+```yaml
+healthcheck:
+  test: mc-health
+  start_period: 3m  # Increase for modded servers
+  interval: 10s
+```
+
+### Intermittent Health Check Failures
+
+Adjust retry count and interval:
+
+```yaml
+healthcheck:
+  test: mc-health
+  interval: 15s     # Check less frequently
+  retries: 5        # Allow more retries
+  timeout: 30s      # Longer timeout
+```
+
+### Health Check Not Working
+
+Verify mc-monitor is working:
+
+```bash
+# Test mc-monitor directly
+docker exec mc mc-monitor status
+
+# Check mc-health script
+docker exec mc which mc-health
+```
+
+## Best Practices
+
+1. **Use mc-health wrapper** instead of calling mc-monitor directly
+2. **Increase start_period** for modded servers (2-5 minutes)
+3. **Configure appropriate timeouts** based on server performance
+4. **Monitor health check logs** during initial setup
+5. **Disable health checks** only when absolutely necessary
+6. **Use with restart policies** for automatic recovery
+
+```yaml
+services:
+  mc:
+    image: itzg/minecraft-server
+    restart: unless-stopped
+    healthcheck:
+      test: mc-health
+      start_period: 2m
+      interval: 10s
+      retries: 3
+```

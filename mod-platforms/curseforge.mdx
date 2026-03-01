@@ -1,0 +1,138 @@
+---
+title: Manual CurseForge Server Packs
+description: Install CurseForge server packs manually (deprecated)
+---
+
+<Warning>
+This mod platform type is deprecated. Please use [Auto CurseForge](/mod-platforms/auto-curseforge) for new deployments.
+</Warning>
+
+## Overview
+
+Enable this server mode by setting `MODPACK_PLATFORM`, `MOD_PLATFORM` or `TYPE` to `CURSEFORGE`.
+
+You need to specify a modpack to run using the `CF_SERVER_MOD` environment variable. CurseForge server modpacks are available together with their respective client modpacks at [CurseForge Modpacks](https://www.curseforge.com/minecraft/modpacks).
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TYPE` | Yes | Set to `CURSEFORGE` |
+| `CF_SERVER_MOD` | Yes | Filename or path to the server modpack ZIP file |
+| `CF_BASE_DIR` | No | Directory where modpack is expanded (default: `/data/FeedTheBeast`) |
+| `USE_MODPACK_START_SCRIPT` | No | Use bundled start script (default: `true`) |
+| `FTB_LEGACYJAVAFIXER` | No | Apply legacy Java fixer workaround (default: `false`) |
+
+## Basic Usage
+
+<Steps>
+  <Step title="Download the server modpack">
+    Download the server modpack ZIP file from CurseForge
+  </Step>
+  
+  <Step title="Configure with filename">
+    Reference the modpack file by name:
+    
+    ```bash
+    docker run -d --pull=always -v /path/on/host:/data \
+        -e TYPE=CURSEFORGE \
+        -e CF_SERVER_MOD=SkyFactory_4_Server_4.1.0.zip \
+        -p 25565:25565 -e EULA=TRUE --name mc \
+        itzg/minecraft-server
+    ```
+  </Step>
+</Steps>
+
+## Using a Separate Modpack Directory
+
+To keep pre-downloaded modpacks separate from your data directory, attach another volume:
+
+```bash
+docker run -d --pull=always -v /path/on/host:/data \
+    -v /path/to/modpacks:/modpacks \
+    -e TYPE=CURSEFORGE \
+    -e CF_SERVER_MOD=/modpacks/SkyFactory_4_Server_4.1.0.zip \
+    -p 25565:25565 -e EULA=TRUE --name mc \
+    itzg/minecraft-server
+```
+
+<CodeGroup>
+```yaml Docker Compose
+services:
+  mc:
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: CURSEFORGE
+      CF_SERVER_MOD: /modpacks/SkyFactory_4_Server_4.1.0.zip
+    volumes:
+      - ./data:/data
+      - ./modpacks:/modpacks
+    ports:
+      - "25565:25565"
+```
+
+```bash Docker CLI
+docker run -d --pull=always \
+  -v /path/on/host:/data \
+  -v /path/to/modpacks:/modpacks \
+  -e TYPE=CURSEFORGE \
+  -e CF_SERVER_MOD=/modpacks/SkyFactory_4_Server_4.1.0.zip \
+  -p 25565:25565 \
+  -e EULA=TRUE \
+  --name mc \
+  itzg/minecraft-server
+```
+</CodeGroup>
+
+## Modpack Data Directory
+
+By default, CurseForge modpacks are expanded into `/data/FeedTheBeast` and executed from there. This location was chosen for legacy reasons when Curse and FTB were maintained together.
+
+Change the directory by setting `CF_BASE_DIR`:
+
+```yaml
+environment:
+  CF_BASE_DIR: /data
+```
+
+## Advanced Configuration
+
+### Buggy Start Scripts
+
+Some modpacks have buggy or overly complex start scripts. Avoid using the bundled start script by setting:
+
+```yaml
+environment:
+  USE_MODPACK_START_SCRIPT: "false"
+```
+
+### Fixing "unable to launch forgemodloader"
+
+If your server fails to load with an error like:
+
+```
+unable to launch forgemodloader
+```
+
+Apply this workaround:
+
+```yaml
+environment:
+  FTB_LEGACYJAVAFIXER: "true"
+```
+
+## Migration to Auto CurseForge
+
+<Note>
+For better automation, upgrade tracking, and cleanup capabilities, migrate to [Auto CurseForge](/mod-platforms/auto-curseforge).
+</Note>
+
+Auto CurseForge provides:
+
+- Automatic version upgrades
+- File cleanup between versions
+- API-based modpack installation
+- Better mod exclusion/inclusion controls
+
+See the [Auto CurseForge documentation](/mod-platforms/auto-curseforge) for migration instructions.
