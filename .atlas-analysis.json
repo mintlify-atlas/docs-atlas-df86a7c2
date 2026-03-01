@@ -1,0 +1,166 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Docker Minecraft Server",
+  "projectDescription": "Docker image that automatically provisions and manages Minecraft Java Edition servers",
+  "theme": "aspen",
+  "primaryColor": "#4CAF50",
+  "lightColor": "#81C784",
+  "darkColor": "#388E3C",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "docker-compose"
+            ]
+          },
+          {
+            "group": "Server Types",
+            "pages": [
+              "server-types/overview",
+              "server-types/vanilla",
+              "server-types/paper",
+              "server-types/fabric",
+              "server-types/forge",
+              "server-types/bukkit-spigot",
+              "server-types/quilt",
+              "server-types/hybrids",
+              "server-types/others"
+            ]
+          },
+          {
+            "group": "Mod Platforms",
+            "pages": [
+              "mod-platforms/overview",
+              "mod-platforms/curseforge",
+              "mod-platforms/modrinth",
+              "mod-platforms/ftb",
+              "mod-platforms/auto-curseforge",
+              "mod-platforms/gtnh"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/server-properties",
+              "configuration/environment-variables",
+              "configuration/jvm-options",
+              "configuration/interpolation",
+              "configuration/misc-options"
+            ]
+          },
+          {
+            "group": "Mods & Plugins",
+            "pages": [
+              "mods-plugins/overview",
+              "mods-plugins/generic-packs",
+              "mods-plugins/modrinth-mods",
+              "mods-plugins/curseforge-files",
+              "mods-plugins/spiget",
+              "mods-plugins/packwiz"
+            ]
+          },
+          {
+            "group": "Versions",
+            "pages": [
+              "versions/minecraft",
+              "versions/java"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/data-directory",
+              "operations/world-data",
+              "operations/healthcheck",
+              "operations/autopause",
+              "operations/autostop",
+              "operations/autoscale",
+              "operations/rcon-commands"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/kubernetes",
+              "deployment/docker-swarm",
+              "deployment/examples"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/troubleshooting",
+              "advanced/log4j",
+              "advanced/raspberry-pi",
+              "advanced/related-projects",
+              "advanced/contributing",
+              "advanced/building"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Environment Variables",
+            "pages": [
+              "api/variables-reference"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "api/rcon-cli",
+              "api/mc-monitor",
+              "api/mc-image-helper"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automatic server installation and version management",
+    "Support for multiple server types (Vanilla, Paper, Fabric, Forge, etc.)",
+    "Automated mod and plugin management from multiple platforms",
+    "Built-in autopause/autostop for resource optimization",
+    "Docker Compose and Kubernetes deployment support",
+    "Extensive configuration via environment variables",
+    "Health checking and monitoring capabilities",
+    "RCON integration for remote server management"
+  ],
+  "publicApiSurface": [
+    "Environment: EULA",
+    "Environment: TYPE",
+    "Environment: VERSION",
+    "Environment: MEMORY",
+    "Environment: SERVER_NAME",
+    "Environment: SERVER_PORT",
+    "Environment: DIFFICULTY",
+    "Environment: WHITELIST",
+    "Environment: OPS",
+    "Environment: MOTD",
+    "Environment: MAX_PLAYERS",
+    "Environment: MODE",
+    "Environment: PVP",
+    "Environment: ENABLE_AUTOPAUSE",
+    "Environment: ENABLE_AUTOSTOP",
+    "Environment: MODRINTH_PROJECTS",
+    "Environment: CURSEFORGE_FILES",
+    "Environment: SPIGET_RESOURCES",
+    "Command: rcon-cli",
+    "Command: mc-monitor",
+    "Command: mc-image-helper",
+    "Command: mc-server-runner",
+    "Volume: /data",
+    "Port: 25565"
+  ]
+}
